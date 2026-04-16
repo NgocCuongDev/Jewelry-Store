@@ -1,15 +1,22 @@
 package com.rainbowforest.apigateway.config;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+
+import org.springframework.security.config.Customizer;
 
 @Configuration
-public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
-	
-	@Override
-	protected void configure(HttpSecurity http) throws Exception {
-		http.csrf().disable().authorizeRequests().antMatchers("/").permitAll();
-	}
+@EnableWebFluxSecurity
+public class WebSecurityConfig {
 
+    @Bean
+    public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+        http.csrf(csrf -> csrf.disable())
+            .cors(Customizer.withDefaults())
+            .authorizeExchange(exchanges -> exchanges.pathMatchers("/**").permitAll());
+        return http.build();
+    }
 }

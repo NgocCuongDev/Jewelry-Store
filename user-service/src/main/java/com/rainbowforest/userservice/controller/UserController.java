@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 
 @RestController
@@ -77,5 +77,33 @@ public class UserController {
     			return new ResponseEntity<User>(HttpStatus.INTERNAL_SERVER_ERROR);
 		}
     	return new ResponseEntity<User>(HttpStatus.BAD_REQUEST);
+    }
+
+    @PutMapping (value = "/users/{id}")
+    public ResponseEntity<User> updateUser(@PathVariable("id") Long id, @RequestBody User user){
+        User updatedUser = userService.updateUser(id, user);
+        if(updatedUser != null) {
+            return new ResponseEntity<User>(
+                updatedUser,
+                headerGenerator.getHeadersForSuccessGetMethod(),
+                HttpStatus.OK);
+        }
+        return new ResponseEntity<User>(
+            headerGenerator.getHeadersForError(),
+            HttpStatus.NOT_FOUND);
+    }
+
+    @DeleteMapping (value = "/users/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable("id") Long id){
+        User user = userService.getUserById(id);
+        if(user != null) {
+            userService.deleteUser(id);
+            return new ResponseEntity<Void>(
+                headerGenerator.getHeadersForSuccessGetMethod(),
+                HttpStatus.NO_CONTENT);
+        }
+        return new ResponseEntity<Void>(
+            headerGenerator.getHeadersForError(),
+            HttpStatus.NOT_FOUND);
     }
 }

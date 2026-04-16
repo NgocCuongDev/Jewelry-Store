@@ -1,9 +1,9 @@
 package com.rainbowforest.orderservice.domain;
 
-import javax.persistence.*;
-import javax.validation.constraints.NotNull;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -16,7 +16,10 @@ public class Order {
 
     @Column (name = "ordered_date")
     @NotNull
-    private LocalDate orderedDate;
+    private LocalDateTime orderedDate;
+
+    @Column (name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @Column(name = "status")
     @NotNull
@@ -24,6 +27,24 @@ public class Order {
 
     @Column (name = "total")
     private BigDecimal total;
+
+    @Column (name = "shipping_address")
+    private String shippingAddress;
+
+    @Column (name = "cust_name")
+    private String custName;
+
+    @Column (name = "cust_phone")
+    private String custPhone;
+
+    @Column (name = "payment_method")
+    private String paymentMethod;
+
+    @Column (name = "ship_method")
+    private String shipMethod;
+
+    @Column (name = "customer_note")
+    private String customerNote;
 
     @ManyToMany (cascade = CascadeType.ALL)
     @JoinTable (name = "cart" , joinColumns = @JoinColumn(name = "order_id"), inverseJoinColumns = @JoinColumn (name = "item_id"))
@@ -37,6 +58,17 @@ public class Order {
 		
 	}
 
+    @PrePersist
+    protected void onCreate() {
+        orderedDate = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
 	public Long getId() {
 		return id;
 	}
@@ -45,13 +77,21 @@ public class Order {
 		this.id = id;
 	}
 
-	public LocalDate getOrderedDate() {
+	public LocalDateTime getOrderedDate() {
 		return orderedDate;
 	}
 
-	public void setOrderedDate(LocalDate orderedDate) {
+	public void setOrderedDate(LocalDateTime orderedDate) {
 		this.orderedDate = orderedDate;
 	}
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 
 	public String getStatus() {
 		return status;
@@ -84,4 +124,52 @@ public class Order {
 	public void setUser(User user) {
 		this.user = user;
 	}
+
+    public String getShippingAddress() {
+        return shippingAddress;
+    }
+
+    public void setShippingAddress(String shippingAddress) {
+        this.shippingAddress = shippingAddress;
+    }
+
+    public String getCustName() {
+        return custName;
+    }
+
+    public void setCustName(String custName) {
+        this.custName = custName;
+    }
+
+    public String getCustPhone() {
+        return custPhone;
+    }
+
+    public void setCustPhone(String custPhone) {
+        this.custPhone = custPhone;
+    }
+
+    public String getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public String getShipMethod() {
+        return shipMethod;
+    }
+
+    public void setShipMethod(String shipMethod) {
+        this.shipMethod = shipMethod;
+    }
+
+    public String getCustomerNote() {
+        return customerNote;
+    }
+
+    public void setCustomerNote(String customerNote) {
+        this.customerNote = customerNote;
+    }
 }

@@ -2,7 +2,7 @@ package com.rainbowforest.recommendationservice.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.NoArgsConstructor;
-import javax.persistence.*;
+import jakarta.persistence.*;
 import java.util.List;
 
 @Entity
@@ -17,15 +17,15 @@ public class User {
 
     @OneToMany (mappedBy = "user")
     @JsonIgnore
-    private List<Recommendation> recomendations;
+    private List<Recommendation> recommendations;
     
     public User() {
     	
     }
 
-    public User(String userName, List<Recommendation> recomendations) {
+    public User(String userName, List<Recommendation> recommendations) {
         this.userName = userName;
-        this.recomendations = recomendations;
+        this.recommendations = recommendations;
     }
 
     public String getUserName() {
@@ -36,11 +36,11 @@ public class User {
         this.userName = userName;
     }
 
-    public List<Recommendation> getRecomendations() {
-        return recomendations;
+    public List<Recommendation> getRecommendations() {
+        return recommendations;
     }
 
-    public void setRecomendations(List<Recommendation> recomendations) {
-        this.recomendations = recomendations;
+    public void setRecommendations(List<Recommendation> recommendations) {
+        this.recommendations = recommendations;
     }
 }

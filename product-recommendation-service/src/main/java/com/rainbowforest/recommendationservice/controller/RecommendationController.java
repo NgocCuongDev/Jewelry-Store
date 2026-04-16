@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 
 @RestController
@@ -30,8 +30,14 @@ public class RecommendationController {
     private HeaderGenerator headerGenerator;
 
     @GetMapping(value = "/recommendations")
-    private ResponseEntity<List<Recommendation>> getAllRating(@RequestParam("name") String productName){
-        List<Recommendation> recommendations = recommendationService.getAllRecommendationByProductName(productName);
+    private ResponseEntity<List<Recommendation>> getAllRating(@RequestParam(value = "name", required = false) String productName){
+        List<Recommendation> recommendations;
+        if (productName != null && !productName.isEmpty()) {
+            recommendations = recommendationService.getAllRecommendationByProductName(productName);
+        } else {
+            recommendations = recommendationService.getAllRecommendations();
+        }
+
         if(!recommendations.isEmpty()) {
         	return new ResponseEntity<List<Recommendation>>(
         		recommendations,

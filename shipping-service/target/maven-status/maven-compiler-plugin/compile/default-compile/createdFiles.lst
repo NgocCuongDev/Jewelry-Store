@@ -1,0 +1,5 @@
+com\rainbowforest\shippingservice\domain\Shipping.class
+com\rainbowforest\shippingservice\repository\ShippingRepository.class
+com\rainbowforest\shippingservice\controller\ShippingController.class
+com\rainbowforest\shippingservice\service\ShippingService.class
+com\rainbowforest\shippingservice\ShippingServiceApplication.class

@@ -14,24 +14,27 @@ public class ProductServiceImpl implements ProductService {
     @Autowired
     private ProductRepository productRepository;
 
+    private static final String UPLOAD_DIR = "src/main/resources/static/";
+
     @Override
     public List<Product> getAllProduct() {
         return productRepository.findAll();
     }
 
     @Override
-    public List<Product> getAllProductByCategory(String category) {
-        return productRepository.findAllByCategory(category);
+    public List<Product> getAllProductByCategory(Long categoryId) {
+        return productRepository.findAllByCategoryId(categoryId);
     }
 
     @Override
     public Product getProductById(Long id) {
-        return productRepository.getOne(id);
+        return productRepository.findById(id).orElse(null);
     }
 
     @Override
     public List<Product> getAllProductsByName(String name) {
-        return productRepository.findAllByProductName(name);
+        String trimmedName = (name != null) ? name.trim() : "";
+        return productRepository.findAllByProductNameContainingIgnoreCase(trimmedName);
     }
 
     @Override
@@ -40,7 +43,38 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public Product updateProduct(Long id, Product product) {
+        Product existingProduct = productRepository.findById(id).orElse(null);
+        if (existingProduct != null) {
+            // Cleanup old image if it's being replaced
+            if (existingProduct.getImageUrl() != null && !existingProduct.getImageUrl().equals(product.getImageUrl())) {
+                deleteImageFile(existingProduct.getImageUrl());
+            }
+            product.setId(id);
+            return productRepository.save(product);
+        }
+        return null;
+    }
+
+    @Override
     public void deleteProduct(Long productId) {
-        productRepository.deleteById(productId);
+        Product existingProduct = productRepository.findById(productId).orElse(null);
+        if (existingProduct != null) {
+            if (existingProduct.getImageUrl() != null) {
+                deleteImageFile(existingProduct.getImageUrl());
+            }
+            productRepository.deleteById(productId);
+        }
+    }
+
+    private void deleteImageFile(String imageUrl) {
+        if (imageUrl == null || imageUrl.isEmpty()) return;
+        try {
+            java.nio.file.Path path = java.nio.file.Paths.get(UPLOAD_DIR + imageUrl);
+            java.nio.file.Files.deleteIfExists(path);
+            System.out.println("Deleted old image file: " + path.toAbsolutePath());
+        } catch (java.io.IOException e) {
+            System.err.println("Failed to delete image file: " + e.getMessage());
+        }
     }
 }

@@ -1,9 +1,10 @@
 package com.rainbowforest.productcatalogservice.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import javax.persistence.*;
-import javax.validation.constraints.NotNull;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @Table (name = "products")
@@ -22,16 +23,42 @@ public class Product {
     @NotNull
     private BigDecimal price;
 
-    @Column (name = "discription")
-    private String discription;
+    @Column (name = "discount_price")
+    private BigDecimal discountPrice;
 
-    @Column (name = "category")
-    @NotNull
-    private String category;
+    @Column (name = "description")
+    private String description;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "category_id")
+    private Category category;
 
     @Column (name = "availability")
     @NotNull
     private int availability;
+
+    @Column (name = "image_url")
+    private String imageUrl;
+
+    @Column (name = "active", nullable = false)
+    private Boolean active = true;
+
+    @Column (name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column (name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
 	public Product() {
 
@@ -61,19 +88,27 @@ public class Product {
 		this.price = price;
 	}
 
-	public String getDiscription() {
-		return discription;
+	public BigDecimal getDiscountPrice() {
+		return discountPrice;
 	}
 
-	public void setDiscription(String discription) {
-		this.discription = discription;
+	public void setDiscountPrice(BigDecimal discountPrice) {
+		this.discountPrice = discountPrice;
 	}
 
-	public String getCategory() {
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	public Category getCategory() {
 		return category;
 	}
 
-	public void setCategory(String category) {
+	public void setCategory(Category category) {
 		this.category = category;
 	}
 
@@ -83,5 +118,36 @@ public class Product {
 
 	public void setAvailability(int availability) {
 		this.availability = availability;
-	} 
-}
+	}
+
+	public String getImageUrl() {
+		return imageUrl;
+	}
+
+	public void setImageUrl(String imageUrl) {
+		this.imageUrl = imageUrl;
+	}
+
+	public Boolean isActive() {
+		return active;
+	}
+
+	public void setActive(Boolean active) {
+		this.active = active;
+	}
+
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
+	}
+
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
+	}
+
+	public LocalDateTime getUpdatedAt() {
+		return updatedAt;
+	}
+
+	public void setUpdatedAt(LocalDateTime updatedAt) {
+		this.updatedAt = updatedAt;
+	}}

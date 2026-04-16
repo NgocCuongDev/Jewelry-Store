@@ -1,7 +1,7 @@
 package com.rainbowforest.userservice.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import javax.persistence.*;
+import jakarta.persistence.*;
 
 @Entity
 @Table (name = "users_details")
@@ -29,6 +29,8 @@ public class UserDetails {
     private String locality;
     @Column (name = "country", length = 30)
     private String country;
+    @Column (name = "image")
+    private String image;
 
     @OneToOne(mappedBy = "userDetails")
 	@JsonIgnore 
@@ -115,6 +117,14 @@ public class UserDetails {
 
 	public void setCountry(String country) {
 		this.country = country;
+	}
+
+	public String getImage() {
+		return image;
+	}
+
+	public void setImage(String image) {
+		this.image = image;
 	}
 
 	public User getUser() {

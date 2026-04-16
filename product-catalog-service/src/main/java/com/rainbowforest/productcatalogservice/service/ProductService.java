@@ -6,9 +6,10 @@ import com.rainbowforest.productcatalogservice.entity.Product;
 
 public interface ProductService {
     public List<Product> getAllProduct();
-    public List<Product> getAllProductByCategory(String category);
+    public List<Product> getAllProductByCategory(Long categoryId);
     public Product getProductById(Long id);
     public List<Product> getAllProductsByName(String name);
     public Product addProduct(Product product);
+    public Product updateProduct(Long id, Product product);
     public void deleteProduct(Long productId);
 }

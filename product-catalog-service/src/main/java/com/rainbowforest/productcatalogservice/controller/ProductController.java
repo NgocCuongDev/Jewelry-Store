@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 public class ProductController {
@@ -21,29 +22,21 @@ public class ProductController {
     @GetMapping (value = "/products")
     public ResponseEntity<List<Product>> getAllProducts(){
         List<Product> products =  productService.getAllProduct();
-        if(!products.isEmpty()) {
-        	return new ResponseEntity<List<Product>>(
-        			products,
-        			headerGenerator.getHeadersForSuccessGetMethod(),
-        			HttpStatus.OK);
-        }
+        // Trả về 200 OK ngay cả khi không có sản phẩm nào để Frontend không bị lỗi 404
         return new ResponseEntity<List<Product>>(
-        		headerGenerator.getHeadersForError(),
-        		HttpStatus.NOT_FOUND);       
+                products,
+                headerGenerator.getHeadersForSuccessGetMethod(),
+                HttpStatus.OK);
     }
 
-    @GetMapping(value = "/products", params = "category")
-    public ResponseEntity<List<Product>> getAllProductByCategory(@RequestParam ("category") String category){
-        List<Product> products = productService.getAllProductByCategory(category);
-        if(!products.isEmpty()) {
-        	return new ResponseEntity<List<Product>>(
-        			products,
-        			headerGenerator.getHeadersForSuccessGetMethod(),
-        			HttpStatus.OK);
-        }
+    @GetMapping(value = "/products", params = "categoryId")
+    public ResponseEntity<List<Product>> getAllProductByCategory(@RequestParam ("categoryId") Long categoryId){
+        List<Product> products = productService.getAllProductByCategory(categoryId);
+        // Trả về 200 OK kèm mảng rỗng thay vì 404 để Frontend không bị lỗi
         return new ResponseEntity<List<Product>>(
-        		headerGenerator.getHeadersForError(),
-        		HttpStatus.NOT_FOUND);
+                products,
+                headerGenerator.getHeadersForSuccessGetMethod(),
+                HttpStatus.OK);
     }
 
     @GetMapping (value = "/products/{id}")
@@ -60,17 +53,50 @@ public class ProductController {
         		HttpStatus.NOT_FOUND);
     }
 
-    @GetMapping (value = "/products", params = "name")
+    @GetMapping (value = "/products/search")
     public ResponseEntity<List<Product>> getAllProductsByName(@RequestParam ("name") String name){
         List<Product> products =  productService.getAllProductsByName(name);
-        if(!products.isEmpty()) {
-        	return new ResponseEntity<List<Product>>(
-        			products,
-        			headerGenerator.getHeadersForSuccessGetMethod(),
-        			HttpStatus.OK);
-        }
+        // Trả về 200 OK ngay cả khi không tìm thấy để Frontend xử lý mảng rỗng
         return new ResponseEntity<List<Product>>(
-        		headerGenerator.getHeadersForError(),
-        		HttpStatus.NOT_FOUND);
+                products,
+                headerGenerator.getHeadersForSuccessGetMethod(),
+                HttpStatus.OK);
+    }
+    @PostMapping (value = "/products")
+    @ResponseStatus (HttpStatus.CREATED)
+    public ResponseEntity<Product> addProduct(@RequestBody Product product, HttpServletRequest request) {
+        Product newProduct = productService.addProduct(product);
+        return new ResponseEntity<Product>(
+                newProduct,
+                headerGenerator.getHeadersForSuccessPostMethod(request, newProduct.getId()),
+                HttpStatus.CREATED);
+    }
+
+    @PutMapping (value = "/products/{id}")
+    public ResponseEntity<Product> updateProduct(@PathVariable ("id") long id, @RequestBody Product product){
+        Product updatedProduct = productService.updateProduct(id, product);
+        if(updatedProduct != null) {
+            return new ResponseEntity<Product>(
+                    updatedProduct,
+                    headerGenerator.getHeadersForSuccessGetMethod(),
+                    HttpStatus.OK);
+        }
+        return new ResponseEntity<Product>(
+                headerGenerator.getHeadersForError(),
+                HttpStatus.NOT_FOUND);
+    }
+
+    @DeleteMapping (value = "/products/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable ("id") long id){
+        Product product = productService.getProductById(id);
+        if(product != null) {
+            productService.deleteProduct(id);
+            return new ResponseEntity<Void>(
+                    headerGenerator.getHeadersForSuccessGetMethod(),
+                    HttpStatus.OK);
+        }
+        return new ResponseEntity<Void>(
+                headerGenerator.getHeadersForError(),
+                HttpStatus.NOT_FOUND);
     }
 }

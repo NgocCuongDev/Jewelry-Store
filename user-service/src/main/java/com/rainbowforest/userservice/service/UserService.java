@@ -9,4 +9,7 @@ public interface UserService {
     User getUserById(Long id);
     User getUserByName(String userName);
     User saveUser(User user);
+    User updateUser(Long id, User user);
+    void deleteUser(Long id);
+    User authenticateUser(String userName, String password);
 }

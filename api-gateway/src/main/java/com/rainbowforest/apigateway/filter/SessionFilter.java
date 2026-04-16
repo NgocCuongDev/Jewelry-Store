@@ -1,44 +1,32 @@
 package com.rainbowforest.apigateway.filter;
 
-import com.netflix.zuul.ZuulFilter;
-import com.netflix.zuul.context.RequestContext;
-import com.netflix.zuul.exception.ZuulException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.session.Session;
-import org.springframework.session.SessionRepository;
-import javax.servlet.http.HttpSession;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.core.Ordered;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
 
-public class SessionFilter extends ZuulFilter {
+// @Component
+public class SessionFilter implements GlobalFilter, Ordered {
 
     private static final Logger logger = LoggerFactory.getLogger(SessionFilter.class);
 
-    @Autowired
-    private SessionRepository sessionRepository;
-
     @Override
-    public String filterType() {
-        return "pre";
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        return exchange.getSession().flatMap(session -> {
+            logger.info("Session ID: {}", session.getId());
+            ServerWebExchange mutatedExchange = exchange.mutate()
+                    .request(r -> r.header("Cookie", "SESSION=" + session.getId()))
+                    .build();
+            return chain.filter(mutatedExchange);
+        });
     }
 
     @Override
-    public int filterOrder() {
+    public int getOrder() {
         return 10;
-    }
-
-    @Override
-    public boolean shouldFilter() {
-        return true;
-    }
-
-    @Override
-    public Object run() throws ZuulException {
-        RequestContext ctx = RequestContext.getCurrentContext();
-        HttpSession httpSession = ctx.getRequest().getSession();
-        Session session = sessionRepository.findById(httpSession.getId());
-        ctx.addZuulRequestHeader("Cookie",httpSession.getId());
-        logger.info(httpSession.getId());
-        return null;
     }
 }

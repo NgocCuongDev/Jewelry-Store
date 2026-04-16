@@ -23,6 +23,11 @@ public class RecommendationServiceImpl implements RecommendationService {
     }
 
     @Override
+    public List<Recommendation> getAllRecommendations() {
+        return recommendationRepository.findAll();
+    }
+
+    @Override
     public void deleteRecommendation(Long id) {
         recommendationRepository.deleteById(id);
     }
