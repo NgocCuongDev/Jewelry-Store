@@ -42,4 +42,20 @@ public class MenuService {
     public Menu addMenu(Menu menu) {
         return menuRepository.save(menu);
     }
+
+    public Menu updateMenu(Long id, Menu menuDetails) {
+        return menuRepository.findById(id).map(menu -> {
+            menu.setName(menuDetails.getName());
+            menu.setLink(menuDetails.getLink());
+            menu.setType(menuDetails.getType());
+            menu.setParentId(menuDetails.getParentId());
+            menu.setSortOrder(menuDetails.getSortOrder());
+            menu.setStatus(menuDetails.getStatus());
+            return menuRepository.save(menu);
+        }).orElseThrow(() -> new RuntimeException("Menu not found with id " + id));
+    }
+
+    public void deleteMenu(Long id) {
+        menuRepository.deleteById(id);
+    }
 }

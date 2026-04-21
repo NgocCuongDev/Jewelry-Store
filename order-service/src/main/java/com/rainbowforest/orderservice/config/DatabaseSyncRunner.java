@@ -3,6 +3,7 @@ package com.rainbowforest.orderservice.config;
 import com.rainbowforest.orderservice.domain.Order;
 import com.rainbowforest.orderservice.domain.Product;
 import com.rainbowforest.orderservice.feignclient.ProductClient;
+import com.rainbowforest.orderservice.feignclient.ProductDto;
 import com.rainbowforest.orderservice.repository.OrderRepository;
 import com.rainbowforest.orderservice.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,13 +31,15 @@ public class DatabaseSyncRunner implements CommandLineRunner {
         for (Product localProduct : localProducts) {
             try {
                 if (localProduct.getCatalogId() == null) continue;
-                Product catalogProduct = productClient.getProductById(localProduct.getCatalogId());
+                ProductDto catalogProduct = productClient.getProductById(localProduct.getCatalogId());
                 if (catalogProduct != null) {
                     localProduct.setImageUrl(catalogProduct.getImageUrl());
                     localProduct.setProductName(catalogProduct.getProductName());
-                    localProduct.setPrice(catalogProduct.getPrice());
+                    localProduct.setPrice(catalogProduct.getDiscountPrice() != null ? catalogProduct.getDiscountPrice() : catalogProduct.getPrice());
                     localProduct.setDescription(catalogProduct.getDescription());
-                    localProduct.setCategory(catalogProduct.getCategory());
+                    if (catalogProduct.getCategory() != null) {
+                        localProduct.setCategory(String.valueOf(catalogProduct.getCategory().getOrDefault("categoryName", "Chưa phân loại")));
+                    }
                     localProduct.setAvailability(catalogProduct.getAvailability());
                     productRepository.save(localProduct);
                     System.out.println("Synchronized Product: " + localProduct.getCatalogId());

@@ -43,4 +43,23 @@ public class PostController {
     public Post createPost(@RequestBody Post post) {
         return postRepository.save(post);
     }
+
+    @PutMapping("/post/{id}")
+    public Post updatePost(@PathVariable Long id, @RequestBody Post postDetails) {
+        return postRepository.findById(id).map(post -> {
+            post.setTitle(postDetails.getTitle());
+            post.setSlug(postDetails.getSlug());
+            post.setContent(postDetails.getContent());
+            post.setThumbnail(postDetails.getThumbnail());
+            post.setType(postDetails.getType());
+            post.setTopicId(postDetails.getTopicId());
+            post.setStatus(postDetails.getStatus());
+            return postRepository.save(post);
+        }).orElseThrow(() -> new RuntimeException("Post not found with id " + id));
+    }
+
+    @DeleteMapping("/post/{id}")
+    public void deletePost(@PathVariable Long id) {
+        postRepository.deleteById(id);
+    }
 }

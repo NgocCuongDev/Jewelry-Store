@@ -9,15 +9,14 @@ import { toast } from "react-hot-toast";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useMenu } from "../context/MenuContext";
-import { 
-  Search, Heart, User, ShoppingCart, DoubleChevronDown, 
-  Menu, X, LogOut, ChevronRight, Diamond, Crown, MapPin, Phone, Sparkles 
+import {
+  Search, Heart, User, ShoppingCart, DoubleChevronDown,
+  Menu, X, LogOut, ChevronRight, Diamond, Crown, MapPin, Phone, Sparkles
 } from "lucide-react";
 import DynamicMenu from "./DynamicMenu";
 import SearchBar from "./SearchBar";
 
-// 🎯 Import config
-const IMAGE_URL = process.env.NEXT_PUBLIC_IMAGE_URL || "http://127.0.0.1:8000/storage/";
+import { CATALOG_IMAGE_URL, USER_IMAGE_URL } from "../../config";
 
 export default function Header() {
   const router = useRouter();
@@ -41,7 +40,9 @@ export default function Header() {
   const getAvatarUrl = (avatar) => {
     if (!avatar) return "/images/default-avatar.png";
     if (avatar.startsWith('http')) return avatar;
-    return `${IMAGE_URL}${avatar}`;
+    // Remove "images/" prefix if exists to match API serving from /images/**
+    const cleanAvatar = avatar.replace(/^images\//, '').replace(/^\/+/, '');
+    return `${USER_IMAGE_URL}${cleanAvatar}`;
   };
 
   const handleLogout = async () => {
@@ -63,9 +64,10 @@ export default function Header() {
   };
 
   return (
-    <header className="w-full relative z-[100]">
-      {/* Top Utility Bar */}
-      <div className="bg-green-900 text-green-100 py-2 border-b border-white/10 hidden md:block">
+    <header className="w-full sticky top-0 z-[100]">
+      {/* Top Utility Bar - Tự động ẩn khi cuộn */}
+      <div className={`bg-green-900 text-green-100 border-b border-white/10 hidden md:block transition-all duration-300 overflow-hidden ${isScrolled ? "max-h-0 py-0 opacity-0 border-none" : "max-h-10 py-2 opacity-100"
+        }`}>
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center text-[10px] uppercase tracking-[0.2em] font-medium">
           <div className="flex items-center gap-6">
             <span className="flex items-center gap-2 hover:text-white transition-colors cursor-pointer">
@@ -82,13 +84,12 @@ export default function Header() {
       </div>
 
       {/* Main Header Container */}
-      <div className={`transition-all duration-500 border-b ${
-        isScrolled 
-        ? "bg-green-800/95 backdrop-blur-xl py-3 border-white/10 shadow-2xl" 
-        : "bg-gradient-to-r from-green-800 to-green-600 py-6 border-white/10"
-      }`}>
+      <div className={`transition-all duration-300 border-b ${isScrolled
+        ? "bg-green-950/95 backdrop-blur-2xl py-3 border-white/5 shadow-2xl"
+        : "bg-green-800 py-6 border-white/10"
+        }`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between px-6 gap-8">
-          
+
           {/* Logo Area */}
           <Link href="/" className="flex items-center gap-4 group shrink-0">
             <div className="relative">
@@ -118,7 +119,7 @@ export default function Header() {
 
           {/* Action Icons */}
           <div className="flex items-center gap-4 md:gap-7">
-            
+
             {/* Wishlist */}
             <button className="hidden sm:flex flex-col items-center gap-1.5 text-green-100 hover:text-white transition-all group">
               <div className="relative">
@@ -132,13 +133,13 @@ export default function Header() {
 
             {/* Profile / Account */}
             <div className="relative">
-              <button 
+              <button
                 onClick={handleAccountClick}
                 className="flex flex-col items-center gap-1.5 text-green-100 hover:text-white transition-all group"
               >
                 {isAuthenticated && user ? (
                   <img
-                    src={user.image && user.image !== "null" ? (user.image.startsWith('http') ? user.image : `http://localhost:8900/${user.image}`) : "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
+                    src={getAvatarUrl(user.image)}
                     alt={user.username}
                     className="w-8 h-8 rounded-full object-cover border-2 border-white/50 group-hover:border-yellow-400 transition-all shadow-lg ring-2 ring-green-900/10"
                   />
@@ -161,15 +162,15 @@ export default function Header() {
                   <div className="p-6 bg-gradient-to-br from-green-900 via-green-800 to-green-900 text-center relative overflow-hidden">
                     {/* Decorative element */}
                     <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
-                    
+
                     <img
-                      src={user.image && user.image !== "null" ? (user.image.startsWith('http') ? user.image : `http://localhost:8900/${user.image}`) : "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
+                      src={getAvatarUrl(user.image)}
                       alt={user.username}
                       className="w-20 h-20 rounded-full object-cover mx-auto mb-4 border-4 border-yellow-400/50 shadow-2xl ring-4 ring-green-950/20"
                     />
-                    <h3 className="font-serif font-black text-white text-xl tracking-wide mb-1 flex items-center justify-center gap-2">
-                      <Sparkles size={16} className="text-yellow-400" />
-                      {user.username}
+                    <h3 className="font-sans font-black text-white text-2xl tracking-tighter mb-1 flex items-center justify-center gap-2 drop-shadow-xl">
+                      <Sparkles size={16} className="text-yellow-400 animate-pulse" />
+                      {user.username.toUpperCase()}
                     </h3>
                     <p className="text-[10px] text-green-200 uppercase font-black tracking-[0.2em] opacity-80 mb-4">{user.email || 'Hội viên NNC'}</p>
                     <div className="inline-flex items-center gap-2 bg-yellow-400 text-green-950 text-[10px] px-4 py-1.5 rounded-full font-black uppercase tracking-widest shadow-lg">
@@ -226,7 +227,7 @@ export default function Header() {
       {mobileMenuOpen && (
         <div className="fixed inset-0 top-[110px] bg-green-950/98 backdrop-blur-2xl z-[90] lg:hidden animate-in fade-in duration-300 overflow-y-auto">
           <div className="p-6 pb-24 space-y-8">
-            
+
             {/* Mobile Search */}
             <div className="py-4 border-b border-white/10">
               <p className="text-[10px] font-black text-yellow-400 uppercase tracking-[0.3em] mb-4">Bạn đang tìm gì?</p>
@@ -235,24 +236,24 @@ export default function Header() {
 
             {/* Combined Mobile Menu */}
             <div className="space-y-2">
-               <DynamicMenu 
-                variant="mobile" 
-                onItemClick={() => setMobileMenuOpen(false)} 
+              <DynamicMenu
+                variant="mobile"
+                onItemClick={() => setMobileMenuOpen(false)}
               />
             </div>
 
             {/* Mobile Footer / Auth */}
             {!isAuthenticated && (
               <div className="grid grid-cols-2 gap-4 mt-8 pt-8 border-t border-white/10">
-                <Link 
-                  href="/dang-nhap" 
+                <Link
+                  href="/dang-nhap"
                   className="py-4 text-center text-white font-bold bg-white/10 rounded-2xl hover:bg-white/20 transition-all border border-white/10"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Đăng nhập
                 </Link>
-                <Link 
-                  href="/dang-ky" 
+                <Link
+                  href="/dang-ky"
                   className="py-4 text-center text-green-900 font-bold bg-yellow-400 rounded-2xl hover:bg-yellow-500 transition-all shadow-lg"
                   onClick={() => setMobileMenuOpen(false)}
                 >

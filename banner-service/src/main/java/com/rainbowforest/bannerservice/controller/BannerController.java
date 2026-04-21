@@ -31,4 +31,21 @@ public class BannerController {
     public Banner createBanner(@RequestBody Banner banner) {
         return bannerRepository.save(banner);
     }
+
+    @PutMapping("/banner/{id}")
+    public Banner updateBanner(@PathVariable Long id, @RequestBody Banner bannerDetails) {
+        return bannerRepository.findById(id).map(banner -> {
+            banner.setName(bannerDetails.getName());
+            banner.setLink(bannerDetails.getLink());
+            banner.setImage(bannerDetails.getImage());
+            banner.setPosition(bannerDetails.getPosition());
+            banner.setStatus(bannerDetails.getStatus());
+            return bannerRepository.save(banner);
+        }).orElseThrow(() -> new RuntimeException("Banner not found with id " + id));
+    }
+
+    @DeleteMapping("/banner/{id}")
+    public void deleteBanner(@PathVariable Long id) {
+        bannerRepository.deleteById(id);
+    }
 }

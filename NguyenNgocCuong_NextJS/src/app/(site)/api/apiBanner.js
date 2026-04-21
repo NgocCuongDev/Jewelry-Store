@@ -1,6 +1,6 @@
 // app/(site)/api/apiBanner.js
 import axios from "axios";
-import { API_URL, IMAGE_URL } from "../../config";
+import { API_URL, BANNER_IMAGE_URL } from "../../config";
 
 const api = axios.create({
   baseURL: API_URL,
@@ -16,7 +16,7 @@ export const getBanners = async () => {
       }
       return {
         ...b,
-        image: cleanImage ? (cleanImage.startsWith('http') ? cleanImage : `${IMAGE_URL}${cleanImage.replace(/^\/+/, "")}`) : null
+        image: cleanImage ? (cleanImage.startsWith('http') ? cleanImage : `${BANNER_IMAGE_URL}${cleanImage.replace(/^\/+/, "")}`) : null
       };
     });
   } catch (error) {

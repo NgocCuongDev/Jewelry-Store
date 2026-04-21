@@ -1,5 +1,7 @@
-// import { useState, useMemo } from "react";
-// import { useSearchParams } from "next/navigation";
+"use client";
+
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   List,
   Grid,
@@ -20,10 +22,38 @@ import {
   Diamond,
   RefreshCw
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import ProductCard from "../_components/ProductCard";
 import { getAllProducts, searchProducts } from "../api/apiProduct";
 import { getCategories } from "../api/apiCategory";
+
+// 💎 FloatingItem Luxury - Phong cách Liquid Diamond (Mượt mà + Đa tầng)
+const FloatingItem = ({ icon: Icon, delay = 0, size = 20, top = "50%", left = "50%", springX, springY, factor = 1 }) => {
+  // Biến đổi vị trí chuột theo hệ số (factor) để tạo độ sâu
+  const x = useTransform(springX, [0, 1], [-40 * factor, 40 * factor]);
+  const y = useTransform(springY, [0, 1], [-40 * factor, 40 * factor]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0 }}
+      animate={{ 
+        opacity: [0, 0.5, 0.3, 0.5, 0], // Hiệu ứng Shimmer tự thân
+        scale: [0.8, 1.1, 0.8],
+        rotate: [0, 180, 0]
+      }}
+      style={{ top, left, x, y }} // Di chuyển mượt mà theo lò xo
+      transition={{ 
+        duration: 8 + Math.random() * 5, 
+        repeat: Infinity, 
+        delay,
+        ease: "easeInOut" 
+      }}
+      className="absolute pointer-events-none"
+    >
+      <Icon size={size} className="text-cyan-400/40 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
+    </motion.div>
+  );
+};
 
 export default function ProductListPage() {
   const searchParams = useSearchParams();
@@ -42,18 +72,33 @@ export default function ProductListPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const itemsPerPage = 8;
 
+  // 🎯 VẬT LÝ LÒ XO (SPRING PHYSICS) - Giúp chuyển động trơn tru
+  const mouseX = useMotionValue(0.5);
+  const mouseY = useMotionValue(0.5);
+  const springConfig = { damping: 30, stiffness: 100, mass: 0.5 };
+  const springX = useSpring(mouseX, springConfig);
+  const springY = useSpring(mouseY, springConfig);
+
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState(new Set());
 
-  // Scroll effect
+  // Scroll & Mouse effect
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 100);
+    const handleScroll = () => setIsScrolled(window.scrollY > 100);
+    const handleMouseMove = (e) => {
+      // Cập nhật MotionValue trực tiếp (Không gây re-render liên tục)
+      mouseX.set(e.clientX / window.innerWidth);
+      mouseY.set(e.clientY / window.innerHeight);
     };
+
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
   }, []);
 
   // ----- FETCH DATA -----
@@ -145,41 +190,62 @@ export default function ProductListPage() {
 
   return (
     <div className="min-h-screen bg-[#fafafa]">
-      {/* FLOATING NAVIGATION */}
-      <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${isScrolled ? 'translate-y-0' : '-translate-y-full'}`}>
-        <div className="bg-white/90 backdrop-blur-md border-b border-amber-200/30">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <span className="text-sm font-bold text-amber-900">
-              💎 {filteredProducts.length} tuyệt tác trang sức
-            </span>
-            <div className="flex gap-4">
-              <button onClick={() => setViewMode("grid")} className={`p-2 rounded-lg ${viewMode === "grid" ? "bg-amber-100 text-amber-700" : "text-gray-400"}`}><Grid size={20} /></button>
-              <button onClick={() => setViewMode("list")} className={`p-2 rounded-lg ${viewMode === "list" ? "bg-amber-100 text-amber-700" : "text-gray-400"}`}><List size={20} /></button>
-            </div>
+      {/* STACKED STICKY NAVIGATION - Đã căn chỉnh lại top để khớp với Header */}
+      <div className="sticky top-[139px] left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-b border-amber-200/30">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <span className="text-sm font-bold text-amber-900">
+            💎 {filteredProducts.length} tuyệt tác trang sức
+          </span>
+          <div className="flex gap-4">
+            <button onClick={() => setViewMode("grid")} className={`p-2 rounded-lg ${viewMode === "grid" ? "bg-amber-100 text-amber-700" : "text-gray-400"}`}><Grid size={20} /></button>
+            <button onClick={() => setViewMode("list")} className={`p-2 rounded-lg ${viewMode === "list" ? "bg-amber-100 text-amber-700" : "text-gray-400"}`}><List size={20} /></button>
           </div>
         </div>
       </div>
 
-      {/* HERO SECTION - LUXURY DESIGN */}
-      <div className="relative bg-neutral-900 pt-24 pb-40 overflow-hidden">
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-500/20 via-transparent to-transparent"></div>
+      {/* HERO SECTION - COMPACT LIQUID DIAMOND - Tinh gọn tối đa */}
+      <div className="relative bg-slate-950 pt-28 pb-24 overflow-hidden border-b border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+        {/* Diamond Spotlights and Sparkles */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 left-1/3 w-[800px] h-[800px] bg-cyan-500/10 rounded-full blur-[120px] opacity-40"></div>
+          <div className="absolute bottom-1/4 right-1/3 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[100px] opacity-30"></div>
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,_rgba(6,182,212,0.1),_transparent_80%)]"></div>
+          
+          {/* Starry Dust / Sparkles */}
+          <div className="absolute inset-0 opacity-[0.2]" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '100px 100px' }}></div>
+          <div className="absolute inset-10 opacity-[0.1]" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '150px 150px' }}></div>
         </div>
 
+        {/* Parallax Floating Items - Đã được gán hệ số đa tầng */}
+        <FloatingItem icon={Diamond} size={45} top="15%" left="15%" delay={0} springX={springX} springY={springY} factor={1.2} />
+        <FloatingItem icon={Sparkles} size={30} top="65%" left="12%" delay={2} springX={springX} springY={springY} factor={0.8} />
+        <FloatingItem icon={Gem} size={50} top="10%" left="82%" delay={5} springX={springX} springY={springY} factor={1.5} />
+        <FloatingItem icon={Crown} size={35} top="60%" left="88%" delay={1} springX={springX} springY={springY} factor={0.6} />
+        <FloatingItem icon={Diamond} size={25} top="35%" left="92%" delay={3} springX={springX} springY={springY} factor={1} />
+
         <div className="relative max-w-7xl mx-auto px-6 text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-500 px-4 py-2 rounded-full mb-8 border border-amber-500/20">
-            <Crown size={16} />
-            <span className="text-xs font-bold uppercase tracking-[0.2em]">Authentic Luxury Collection</span>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            className="inline-flex items-center gap-3 bg-white/5 text-cyan-300 px-6 py-2 rounded-full mb-6 border border-cyan-500/30 backdrop-blur-xl shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+          >
+            <Sparkles size={14} className="text-cyan-400" />
+            <span className="text-[9px] font-black uppercase tracking-[0.4em]">The Diamond Symphony</span>
           </motion.div>
 
-          <h1 className="text-5xl md:text-7xl font-serif text-white mb-6">
-            Thế Giới <span className="text-amber-500 italic">Ánh Kim</span> Tinh Xảo
+          <h1 className="text-5xl md:text-7xl font-serif text-white mb-6 leading-[1.1]">
+            Kinh Đô <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-b from-white via-cyan-50 to-slate-400 italic drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]">Ánh Sáng Diamond</span>
           </h1>
 
-          <p className="text-lg text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
-            Nơi tôn vinh vẻ đẹp vĩnh cửu qua những thiết kế trang sức thủ công tinh xảo,
-            mang đậm dấu ấn cá nhân và sự đẳng cấp thượng lưu.
+          <p className="text-base text-slate-400 max-w-xl mx-auto font-light leading-relaxed mb-8 border-l-2 border-cyan-500/40 pl-6">
+            Tuyệt phẩm trang sức kim cương tự nhiên, hiện thân của sự thuần khiết vĩnh cửu
+            và vẻ đẹp sắc sảo vượt thời gian.
           </p>
+
+          <div className="flex justify-center">
+             <div className="w-px h-16 bg-gradient-to-b from-cyan-500/0 via-cyan-500/50 to-cyan-500/0"></div>
+          </div>
         </div>
       </div>
 

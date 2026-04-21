@@ -5,6 +5,7 @@ import com.rainbowforest.orderservice.domain.CartItem;
 import com.rainbowforest.orderservice.domain.Item;
 import com.rainbowforest.orderservice.domain.Product;
 import com.rainbowforest.orderservice.feignclient.ProductClient;
+import com.rainbowforest.orderservice.feignclient.ProductDto;
 import com.rainbowforest.orderservice.repository.CartItemRepository;
 import com.rainbowforest.orderservice.repository.CartRepository;
 import com.rainbowforest.orderservice.repository.ProductRepository;
@@ -31,6 +32,9 @@ public class CartServiceImpl implements CartService {
     @Autowired
     private ProductRepository productRepository;
 
+    @Autowired
+    private CartItemRepository cartItemRepository;
+
     private Cart getOrCreateCart(String cartId) {
         final String finalCartId = (cartId == null) ? "default-cart" : cartId;
         return cartRepository.findByCartId(finalCartId)
@@ -41,43 +45,52 @@ public class CartServiceImpl implements CartService {
     public void addItemToCart(String cartId, Long productId, Integer quantity) {
         Cart cart = getOrCreateCart(cartId);
         
-        // Kiểm tra xem sản phẩm đã có trong database local chưa by catalog_id (catalogId)
+        // Kiểm tra sản phẩm từ Catalog (Product Service)
         Product product = productRepository.findByCatalogId(productId)
                 .map(existingProduct -> {
-                    // Cập nhật thông tin mới nhất từ catalog service để đồng bộ ImageUrl, Description, v.v.
-                    Product latest = productClient.getProductById(productId);
+                    ProductDto latest = productClient.getProductById(productId);
                     if (latest != null) {
                         existingProduct.setImageUrl(latest.getImageUrl());
                         existingProduct.setProductName(latest.getProductName());
-                        existingProduct.setPrice(latest.getPrice());
+                        existingProduct.setPrice(latest.getDiscountPrice() != null ? latest.getDiscountPrice() : latest.getPrice());
                         existingProduct.setDescription(latest.getDescription());
-                        existingProduct.setCategory(latest.getCategory());
+                        if (latest.getCategory() != null) {
+                            existingProduct.setCategory(String.valueOf(latest.getCategory().getOrDefault("categoryName", "Chưa phân loại")));
+                        }
                         existingProduct.setAvailability(latest.getAvailability());
                         return productRepository.save(existingProduct);
                     }
                     return existingProduct;
                 })
                 .orElseGet(() -> {
-                    Product p = productClient.getProductById(productId);
-                    if (p == null) {
-                        throw new RuntimeException("Product not found");
-                    }
+                    ProductDto pDto = productClient.getProductById(productId);
+                    if (pDto == null) throw new RuntimeException("Product not found");
+                    Product p = new Product();
+                    p.setCatalogId(pDto.getId());
+                    p.setProductName(pDto.getProductName());
+                    p.setPrice(pDto.getDiscountPrice() != null ? pDto.getDiscountPrice() : pDto.getPrice());
+                    p.setDescription(pDto.getDescription());
+                    p.setCategory(pDto.getCategory() != null ? String.valueOf(pDto.getCategory().getOrDefault("categoryName", "Chưa phân loại")) : "Chưa phân loại");
+                    p.setAvailability(pDto.getAvailability());
+                    p.setImageUrl(pDto.getImageUrl());
                     return productRepository.save(p);
                 });
 
+        // TỐI ƯU HÓA: Tìm item đồng bộ và an toàn
         Optional<CartItem> existingItem = cart.getItems().stream()
-                .filter(item -> item.getProduct().getCatalogId() != null && item.getProduct().getCatalogId().equals(productId))
+                .filter(item -> item.getProduct() != null && productId.equals(item.getProduct().getCatalogId()))
                 .findFirst();
 
         if (existingItem.isPresent()) {
             CartItem item = existingItem.get();
             item.setQuantity(item.getQuantity() + quantity);
             item.setSubTotal(CartUtilities.getSubTotalForItem(product, item.getQuantity()));
+            cartItemRepository.save(item);
         } else {
             CartItem newItem = new CartItem(quantity, product, CartUtilities.getSubTotalForItem(product, quantity), cart);
             cart.getItems().add(newItem);
+            cartRepository.save(cart);
         }
-        cartRepository.save(cart);
     }
 
     @Override
@@ -89,21 +102,17 @@ public class CartServiceImpl implements CartService {
     @Override
     public void changeItemQuantity(String cartId, Long productId, Integer quantity) {
         Cart cart = getOrCreateCart(cartId);
-        cart.getItems().stream()
-                .filter(item -> item.getProduct() != null && item.getProduct().getCatalogId() != null && item.getProduct().getCatalogId().equals(productId))
-                .findFirst()
-                .ifPresent(item -> {
-                    item.setQuantity(quantity);
-                    item.setSubTotal(CartUtilities.getSubTotalForItem(item.getProduct(), quantity));
-                });
-        cartRepository.save(cart);
+        Product product = productRepository.findByCatalogId(productId).orElse(null);
+        if (product != null) {
+            java.math.BigDecimal newSubTotal = CartUtilities.getSubTotalForItem(product, quantity);
+            cartItemRepository.updateQuantityAndSubTotal(cart.getCartId(), productId, quantity, newSubTotal);
+        }
     }
 
     @Override
     public void deleteItemFromCart(String cartId, Long productId) {
         Cart cart = getOrCreateCart(cartId);
-        cart.getItems().removeIf(item -> item.getProduct() != null && item.getProduct().getCatalogId() != null && item.getProduct().getCatalogId().equals(productId));
-        cartRepository.save(cart);
+        cartItemRepository.deleteByCartIdAndCatalogId(cart.getCartId(), productId);
     }
 
     @Override
@@ -125,5 +134,10 @@ public class CartServiceImpl implements CartService {
     @Override
     public void deleteCart(String cartId) {
         cartRepository.findByCartId(cartId).ifPresent(cart -> cartRepository.delete(cart));
+    }
+
+    @Override
+    public void clearCart(String cartId) {
+        cartItemRepository.deleteAllByCart_CartId(cartId);
     }
 }

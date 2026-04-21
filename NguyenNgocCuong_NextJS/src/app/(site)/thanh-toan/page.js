@@ -146,7 +146,7 @@ export default function CheckoutPage() {
 
       syncCartAfterOrder([]);
       toast.success("🎉 Đặt hàng thành công! Đơn hàng đang được xử lý.");
-      router.push(`/cam-on?orderId=${response.order?.id || response.id}`);
+      router.push(`/thank-you?orderId=${response.order?.id || response.id}`);
 
     } catch (error) {
       console.error("❌ Payment error:", error);
@@ -731,22 +731,25 @@ function OrderSummary({ subtotal, shippingFee, total, cartLength, paymentMethod,
       <button
         onClick={onPayment}
         disabled={loading || !isAuthenticated}
-        className={`w-full py-4 rounded-xl font-semibold text-lg shadow-lg transition-all duration-200 ${
-          !isAuthenticated
-            ? "bg-gray-300 cursor-not-allowed text-gray-500"
-            : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-green-200 hover:shadow-xl transform hover:-translate-y-0.5"
+        className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all duration-300 relative overflow-hidden ${
+          loading || !isAuthenticated
+            ? "bg-gray-300 cursor-not-allowed text-gray-500 scale-95"
+            : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-amber-200 hover:shadow-xl transform hover:-translate-y-1 active:scale-95"
         }`}
       >
         {loading ? (
           <div className="flex items-center justify-center">
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
-            Đang xử lý...
+            ĐANG XỬ LÝ ĐƠN HÀNG...
           </div>
         ) : (
-          <div className="flex items-center justify-center">
-            <Lock className="w-5 h-5 mr-3" />
-            Hoàn tất đơn hàng
+          <div className="flex items-center justify-center gap-3">
+            <Lock className="w-5 h-5" />
+            XÁC NHẬN THANH TOÁN
           </div>
+        )}
+        {loading && (
+          <div className="absolute inset-0 bg-white/10 animate-pulse"></div>
         )}
       </button>
 

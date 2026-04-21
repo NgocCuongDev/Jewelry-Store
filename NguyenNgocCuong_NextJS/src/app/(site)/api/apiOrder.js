@@ -55,7 +55,16 @@ export const createOrder = async (orderData) => {
   try {
     console.log("📦 Sending order data to backend:", orderData);
     
-    const response = await api.post('order', orderData);
+    const userId = orderData.userId;
+    const cartId = orderData.cartId || "default-cart";
+    
+    const requestBody = { ...orderData };
+    delete requestBody.userId;
+    delete requestBody.cartId;
+
+    const response = await api.post(`shop/order/${userId}`, requestBody, {
+      headers: { "Cart-Id": cartId }
+    });
     return response.data;
   } catch (error) {
     console.error("❌ Error creating order:", {
@@ -72,7 +81,7 @@ export const cancelOrder = async (orderId, reason = "") => {
   try {
     console.log("🗑️ Cancelling order:", orderId);
     
-    const response = await api.post(`order/${orderId}/cancel`, {
+    const response = await api.post(`shop/order/${orderId}/cancel`, {
       cancel_reason: reason
     });
     
@@ -91,10 +100,11 @@ export const cancelOrder = async (orderId, reason = "") => {
 // ================== DANH SÁCH ĐƠN HÀNG ==================
 export const getOrders = async (params = {}) => {
   try {
-    const res = await api.get("order", { params });
+    const res = await api.get("shop/order", { params });
+    // Backend trả về List<Order> trực tiếp
     return {
-      orders: res.data.data,
-      meta: res.data.meta,
+      orders: res.data,
+      meta: { total: res.data.length }
     };
   } catch (error) {
     throw formatError(error);
@@ -106,7 +116,7 @@ export const getOrderDetail = async (orderId) => {
   try {
     console.log("🔍 Fetching order detail for ID:", orderId);
     
-    const response = await api.get(`order/${orderId}`);
+    const response = await api.get(`shop/order/${orderId}`);
     console.log("✅ Order detail response:", response.data);
     return response.data;
   } catch (error) {
@@ -122,7 +132,7 @@ export const getOrderDetail = async (orderId) => {
 // ================== CẬP NHẬT TRẠNG THÁI ==================
 export const updateOrderStatus = async (id, status) => {
   try {
-    const res = await api.put(`order/${id}`, { status });
+    const res = await api.put(`shop/order/${id}`, { status });
     return res.data;
   } catch (error) {
     throw formatError(error);
@@ -132,7 +142,7 @@ export const updateOrderStatus = async (id, status) => {
 // ================== XÓA ĐƠN HÀNG ==================
 export const deleteOrder = async (id) => {
   try {
-    const res = await api.delete(`order/${id}`);
+    const res = await api.delete(`shop/order/${id}`);
     return res.data;
   } catch (error) {
     throw formatError(error);
@@ -142,7 +152,7 @@ export const deleteOrder = async (id) => {
 // ================== KHÔI PHỤC ĐƠN HÀNG ==================
 export const restoreOrder = async (id) => {
   try {
-    const res = await api.post(`order/${id}/restore`);
+    const res = await api.post(`shop/order/${id}/restore`);
     return res.data;
   } catch (error) {
     throw formatError(error);
@@ -152,7 +162,7 @@ export const restoreOrder = async (id) => {
 // ================== XUẤT HÓA ĐƠN PDF ==================
 export const exportInvoice = async (id) => {
   try {
-    const res = await api.get(`order/${id}/invoice`, {
+    const res = await api.get(`shop/order/${id}/invoice`, {
       responseType: "blob",
     });
 

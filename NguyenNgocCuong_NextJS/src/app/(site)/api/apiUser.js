@@ -173,7 +173,13 @@ export const getCurrentUser = async () => {
         image: res.data.userDetails?.image,
         email: res.data.userDetails?.email,
         phone: res.data.userDetails?.phoneNumber,
-        fullName: `${res.data.userDetails?.firstName || ''} ${res.data.userDetails?.lastName || ''}`.trim()
+        name: `${res.data.userDetails?.firstName || ''} ${res.data.userDetails?.lastName || ''}`.trim(),
+        address: [
+          res.data.userDetails?.streetNumber,
+          res.data.userDetails?.street,
+          res.data.userDetails?.locality,
+          res.data.userDetails?.country
+        ].filter(Boolean).join(', ')
       }
     };
   } catch (err) {

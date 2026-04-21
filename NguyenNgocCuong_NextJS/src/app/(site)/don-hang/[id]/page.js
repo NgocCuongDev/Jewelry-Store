@@ -44,6 +44,18 @@ export default function OrderDetailPage() {
     fetchOrderDetail();
   }, [orderId]);
 
+  // 🎯 Hàm chuyển đổi trạng thái từ Backend sang Frontend
+  const getStatusId = (statusStr) => {
+    const map = {
+      'PAYMENT_EXPECTED': 1,
+      'PROCESSING': 2,
+      'SHIPPED': 3,
+      'DELIVERED': 4,
+      'CANCELLED': 5
+    };
+    return map[statusStr] || 1;
+  };
+
   const fetchOrderDetail = async () => {
     try {
       setLoading(true);
@@ -53,7 +65,26 @@ export default function OrderDetailPage() {
       const data = await getOrderDetail(orderId);
       console.log("✅ Order data received:", data);
       
-      setOrder(data.order || data);
+      // Chuyển đổi dữ liệu để khớp với frontend
+      const rawOrder = data.order || data;
+      const mappedOrder = {
+        ...rawOrder,
+        status: getStatusId(rawOrder.status),
+        name: rawOrder.custName,
+        phone: rawOrder.custPhone,
+        email: rawOrder.custEmail,
+        address: rawOrder.shippingAddress,
+        details: rawOrder.items?.map(item => ({
+          ...item,
+          product_name: item.product?.productName,
+          image_url: item.product?.imageUrl,
+          price: item.product?.price,
+          qty: item.quantity,
+          amount: item.subTotal
+        })) || []
+      };
+      
+      setOrder(mappedOrder);
     } catch (err) {
       console.error("❌ Error in fetchOrderDetail:", err);
       setError(err.message || "Không thể tải chi tiết đơn hàng");
@@ -134,10 +165,9 @@ export default function OrderDetailPage() {
     return configs[status] || configs[1];
   };
 
-  // 🎯 Tính tổng tiền từ details
+  // 🎯 Lấy tổng tiền trực tiếp từ backend
   const calculateTotal = () => {
-    if (!order?.details) return 0;
-    return order.details.reduce((sum, detail) => sum + (detail.price * detail.qty), 0);
+    return order?.total || 0;
   };
 
   if (loading) {
@@ -244,7 +274,7 @@ export default function OrderDetailPage() {
                       {statusConfig.text}
                     </h3>
                     <p className="text-slate-500 text-sm">
-                      Cập nhật lúc: {new Date(order.updated_at || order.created_at).toLocaleString('vi-VN')}
+                      Cập nhật lúc: {new Date(order.updatedAt || order.orderedDate).toLocaleString('vi-VN')}
                     </p>
                   </div>
                 </div>
@@ -526,35 +556,30 @@ function OrderItemCard({ detail }) {
   const [imageError, setImageError] = useState(false);
   
   const getProductImage = () => {
-    if (detail.image_url) {
-      console.log("🖼️ Using image_url from API:", detail.image_url);
-      return detail.image_url;
+    // Ưu tiên lấy từ image_url (dữ liệu đã được map sẵn)
+    let path = detail.image_url || detail.image;
+
+    if (!path && detail.product?.thumbnail) {
+      path = detail.product.thumbnail;
     }
-    
-    if (detail.image) {
-      if (detail.image.startsWith('http')) {
-        return detail.image;
-      }
-      
-      if (detail.image.startsWith('uploads/')) {
-        const fullUrl = `${IMAGE_URL}${detail.image}`;
-        console.log("🖼️ OrderDetail Image URL:", fullUrl);
-        return fullUrl;
-      }
-      
-      const fullUrl = `${IMAGE_URL}${detail.image}`;
-      console.log("🖼️ OrderDetail Image URL (fallback):", fullUrl);
-      return fullUrl;
+
+    if (!path) return null;
+
+    if (path.startsWith('http')) {
+      return path;
     }
+
+    // Xử lý đường dẫn tương đối
+    // Nếu path bắt đầu bằng 'images/', chúng ta có thể cần xóa nó nếu IMAGE_URL đã bao gồm nó
+    // Hoặc nếu nó bắt đầu bằng 'uploads/', chúng ta cộng nối bình thường.
     
-    if (detail.product?.thumbnail) {
-      const fullUrl = `${IMAGE_URL}${detail.product.thumbnail}`;
-      console.log("🖼️ Fallback to Product Image:", fullUrl);
-      return fullUrl;
+    let processedPath = path;
+    if (path.startsWith('images/')) {
+        // IMAGE_URL của chúng ta là .../api/catalog/images/ nên chúng ta bỏ 'images/' ở path đi
+        processedPath = path.replace('images/', '');
     }
-    
-    console.log("❌ No image available for detail:", detail);
-    return null;
+
+    return `${IMAGE_URL}${processedPath}`;
   };
 
   const productImage = getProductImage();

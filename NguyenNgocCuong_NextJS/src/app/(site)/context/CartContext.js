@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useAuth } from "./AuthContext";
 import { useRouter } from "next/navigation";
+import { getCartFromDB, addItemToDBCart, removeItemFromDBCart } from "../api/apiCart";
 
 const CartContext = createContext();
 
@@ -22,72 +23,47 @@ export function CartProvider({ children }) {
     return "/images/placeholder.png";
   };
 
-  // 🎯 LOAD CART TỪ LOCALSTORAGE - CHỈ KHI KHỞI TẠO
+  // 🎯 LẤY CART ID CHO SECURE SYNC
+  const getCartId = () => {
+    if (user?.id) return `user-${user.id}`;
+    if (typeof window !== 'undefined') {
+      let sessionId = localStorage.getItem('cart_session_id');
+      if (!sessionId) {
+        sessionId = `guest-${Date.now()}`;
+        localStorage.setItem('cart_session_id', sessionId);
+      }
+      return sessionId;
+    }
+    return 'default-cart';
+  };
+
+  // 🎯 LOAD CART TỪ DATABASE (BỎ QUA LOCALSTORAGE)
   useEffect(() => {
     if (!initialized) return;
 
-    const savedCart = localStorage.getItem('cart');
-    const savedUser = localStorage.getItem('user');
+    console.log("🔄 CartContext - Fetching cart from DB for:", user?.email || "Guest");
 
-    console.log("🔄 CartContext - Loading cart:", {
-      initialized,
-      hasUser: !!user,
-      hasSavedCart: !!savedCart,
-      hasSavedUser: !!savedUser
-    });
-
-    // 🎯 CHỈ LOAD CART NẾU CÓ USER VÀ CART TRONG LOCALSTORAGE
-    if (savedCart && savedUser) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        console.log("📦 Loaded cart from localStorage:", parsedCart.length, "items");
-
-        const validatedCart = parsedCart.map(item => ({
-          ...item,
-          image: validateAndNormalizeImage(item.image)
+    getCartFromDB(getCartId())
+      .then((backendCart) => {
+        console.log("📦 Loaded cart from backend DB:", backendCart.length, "items");
+        const parsedCart = backendCart.map(item => ({
+          id: item.product.catalogId || item.product.id,
+          name: item.product.productName || item.product.name,
+          price: item.product.price,
+          qty: item.quantity,
+          image: validateAndNormalizeImage(item.product.imageUrl),
+          variant: null
         }));
-
-        setCart(validatedCart);
-      } catch (error) {
-        console.error("❌ Error loading cart:", error);
+        setCart(parsedCart);
+      })
+      .catch((error) => {
+        console.error("❌ Error loading cart from DB:", error);
         setCart([]);
-      }
-    } else {
-      // 🎯 NẾU KHÔNG CÓ USER HOẶC KHÔNG CÓ CART TRONG LOCALSTORAGE, RESET CART
-      setCart([]);
-    }
-
-    setCartLoaded(true);
-  }, [initialized]);
-
-  // 🎯 LƯU CART VÀO LOCALSTORAGE - KHI CART HOẶC USER THAY ĐỔI
-  useEffect(() => {
-    if (!initialized || !cartLoaded) return;
-
-    console.log("💾 Saving cart to localStorage - User:", user?.email);
-
-    if (user && cart.length > 0) {
-      localStorage.setItem('cart', JSON.stringify(cart));
-      console.log("💾 Saved cart to localStorage:", cart.length, "items");
-    } else if (!user) {
-      localStorage.removeItem('cart');
-      console.log("🧹 Removed cart from localStorage - No user");
-    }
-  }, [cart, user, initialized, cartLoaded]);
-
-  // 🎯 XỬ LÝ ĐĂNG XUẤT - XÓA CART KHI USER CHUYỂN TỪ CÓ -> KHÔNG
-  useEffect(() => {
-    if (!initialized || !cartLoaded) return;
-
-    const savedUser = localStorage.getItem('user');
-    
-    if (savedUser && !user) {
-      console.log("🚪 User logged out - Clearing cart");
-      setCart([]);
-      localStorage.removeItem('cart');
-      toast.success("Đã đăng xuất và xóa giỏ hàng");
-    }
-  }, [user, initialized, cartLoaded]);
+      })
+      .finally(() => {
+        setCartLoaded(true);
+      });
+  }, [user, initialized]);
 
   // 🎯 HÀM TÌM SẢN PHẨM CHÍNH XÁC
   const findProduct = (id, variant = null) => {
@@ -129,6 +105,10 @@ export function CartProvider({ children }) {
           image: validatedImage
         };
         message = `📈 Đã tăng số lượng "${product.name}${product.variant ? ` - ${product.variant}` : ''}"`;
+        
+        // 🔄 ĐỒNG BỘ BACKEND BACKGROUND
+        addItemToDBCart(getCartId(), product.id, newCart[productIndex].qty).catch(console.error);
+        
         return newCart;
       } else {
         const newItem = {
@@ -139,6 +119,10 @@ export function CartProvider({ children }) {
           image: validatedImage
         };
         message = `✅ Đã thêm "${product.name}${product.variant ? ` - ${product.variant}` : ''}" vào giỏ hàng!`;
+        
+        // 🔄 ĐỒNG BỘ BACKEND BACKGROUND
+        addItemToDBCart(getCartId(), product.id, newItem.qty).catch(console.error);
+
         return [...prev, newItem];
       }
     });
@@ -166,10 +150,16 @@ export function CartProvider({ children }) {
       if (currentItem.qty <= 1) {
         newCart = prev.filter((_, index) => index !== productIndex);
         message = `❌ Đã xóa "${currentItem.name}${currentItem.variant ? ` - ${currentItem.variant}` : ''}" khỏi giỏ!`;
+        
+        // 🔄 XÓA KHỎI BACKEND
+        removeItemFromDBCart(getCartId(), id).catch(console.error);
       } else {
         newCart = [...prev];
         newCart[productIndex] = { ...currentItem, qty: currentItem.qty - 1 };
         message = `➖ Đã giảm số lượng "${currentItem.name}${currentItem.variant ? ` - ${currentItem.variant}` : ''}"`;
+        
+        // 🔄 CẬP NHẬT LÊN BACKEND
+        addItemToDBCart(getCartId(), id, newCart[productIndex].qty).catch(console.error);
       }
 
       setTimeout(() => {
@@ -193,6 +183,9 @@ export function CartProvider({ children }) {
 
       const removedItem = prev[productIndex];
       const newCart = prev.filter((_, index) => index !== productIndex);
+
+      // 🔄 XÓA KHỎI BACKEND
+      removeItemFromDBCart(getCartId(), id).catch(console.error);
 
       setTimeout(() => {
         toast.error(`❌ Đã xóa "${removedItem.name}${removedItem.variant ? ` - ${removedItem.variant}` : ''}" khỏi giỏ!`);
@@ -229,12 +222,6 @@ export function CartProvider({ children }) {
     
     console.log("🔄 Syncing cart after order creation");
     setCart(newCart);
-    
-    if (user && newCart.length > 0) {
-      localStorage.setItem('cart', JSON.stringify(newCart));
-    } else {
-      localStorage.removeItem('cart');
-    }
   };
 
   // 🎯 HÀM MỚI ĐỂ CHUYỂN ĐẾN TRANG THANH TOÁN
@@ -276,6 +263,7 @@ export function CartProvider({ children }) {
     syncCartAfterOrder,
     navigateToCheckout,
     canCheckout,
+    getCartId,
     cartInitialized: initialized && cartLoaded
   };
 

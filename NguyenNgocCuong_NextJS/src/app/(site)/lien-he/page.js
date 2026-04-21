@@ -28,6 +28,7 @@ export default function ContactPage() {
   const [userLocation, setUserLocation] = useState(null);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [mapCenter, setMapCenter] = useState({ lat: 10.7769, lng: 106.7009 }); // Mặc định TP.HCM
+  const [mounted, setMounted] = useState(false);
   const { user, isAuthenticated } = useAuth();
 
   const {
@@ -87,6 +88,7 @@ export default function ContactPage() {
 
   // 🎯 TỰ ĐỘNG LẤY VỊ TRÍ KHI TRANG LOAD (TUỲ CHỌN)
   useEffect(() => {
+    setMounted(true);
     // Có thể bật tự động lấy vị trí ở đây nếu muốn
     // getUserLocation();
   }, []);
@@ -309,16 +311,24 @@ export default function ContactPage() {
               )}
 
               <div className="bg-gray-100 rounded-xl overflow-hidden h-64">
-                <iframe
-                  src={getMapUrl()}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0, borderRadius: '12px' }}
-                  allowFullScreen=""
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title={userLocation ? "Vị trí của bạn" : "Vị trí cửa hàng"}
-                ></iframe>
+                {mounted ? (
+                  <iframe
+                    src={getMapUrl()}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0, borderRadius: '12px' }}
+                    allowFullScreen=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title={userLocation ? "Vị trí của bạn" : "Vị trí cửa hàng"}
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                    suppressHydrationWarning
+                  ></iframe>
+                ) : (
+                  <div className="w-100 h-100 flex items-center justify-center bg-gray-200">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
               </div>
               
               <div className="mt-4 flex items-center justify-between text-sm text-gray-600">

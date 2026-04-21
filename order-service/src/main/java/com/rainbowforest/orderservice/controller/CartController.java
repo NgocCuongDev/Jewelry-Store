@@ -19,7 +19,7 @@ public class CartController {
     private HeaderGenerator headerGenerator;
 
     @GetMapping (value = "/cart")
-    public ResponseEntity<List<Object>> getCart(@RequestHeader(value = "Cookie", required = false) String cartId){
+    public ResponseEntity<List<Object>> getCart(@RequestHeader(value = "Cart-Id", required = false) String cartId){
         if (cartId == null) cartId = "default-cart";
         List<Object> cart = cartService.getCart(cartId);
         if(!cart.isEmpty()) {
@@ -37,20 +37,24 @@ public class CartController {
     public ResponseEntity<List<Object>> addItemToCart(
             @RequestParam("productId") Long productId,
             @RequestParam("quantity") Integer quantity,
-            @RequestHeader(value = "Cookie", required = false) String cartId,
+            @RequestHeader(value = "Cart-Id", required = false) String cartId,
             HttpServletRequest request) {
         if (cartId == null) cartId = "default-cart";
         List<Object> cart = cartService.getCart(cartId);
         if(cart != null) {
-        	if(cart.isEmpty()){
-        		cartService.addItemToCart(cartId, productId, quantity);
-        	}else{
-        		if(cartService.checkIfItemIsExist(cartId, productId)){
-        			cartService.changeItemQuantity(cartId, productId, quantity);
-        		}else {
-        			cartService.addItemToCart(cartId, productId, quantity);
-        		}
-        	}
+        	try {
+                if(cart.isEmpty()){
+                    cartService.addItemToCart(cartId, productId, quantity);
+                }else{
+                    if(cartService.checkIfItemIsExist(cartId, productId)){
+                        cartService.changeItemQuantity(cartId, productId, quantity);
+                    }else {
+                        cartService.addItemToCart(cartId, productId, quantity);
+                    }
+                }
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                // Ignore the duplicate insert from parallel request race conditions
+            }
             // Re-fetch updated cart content
             cart = cartService.getCart(cartId);
         	return new ResponseEntity<List<Object>>(
@@ -64,18 +68,21 @@ public class CartController {
     }
 
     @DeleteMapping(value = "/cart", params = "productId")
-    public ResponseEntity<Void> removeItemFromCart(
+    public ResponseEntity<List<Object>> removeItemFromCart(
             @RequestParam("productId") Long productId,
-            @RequestHeader(value = "Cookie", required = false) String cartId){
+            @RequestHeader(value = "Cart-Id", required = false) String cartId){
         if (cartId == null) cartId = "default-cart";
     	List<Object> cart = cartService.getCart(cartId);
     	if(cart != null) {
     		cartService.deleteItemFromCart(cartId, productId);
-            return new ResponseEntity<Void>(
+            // Sau khi xóa, lấy lại danh sách giỏ hàng mới nhất để trả về cho Frontend
+            List<Object> updatedCart = cartService.getCart(cartId);
+            return new ResponseEntity<List<Object>>(
+                    updatedCart,
             		headerGenerator.getHeadersForSuccessGetMethod(),
             		HttpStatus.OK);
     	}
-        return new ResponseEntity<Void>(
+        return new ResponseEntity<List<Object>>(
         		headerGenerator.getHeadersForError(),
         		HttpStatus.NOT_FOUND);
     }

@@ -1,6 +1,6 @@
 // app/(site)/api/apiPost.js
 import axios from "axios";
-import { API_URL, IMAGE_URL } from "../../config";
+import { API_URL, POST_IMAGE_URL } from "../../config";
 
 const api = axios.create({
   baseURL: API_URL,
@@ -16,7 +16,7 @@ export const getPosts = async () => {
       }
       return {
         ...p,
-        thumbnail: cleanThumb ? (cleanThumb.startsWith('http') ? cleanThumb : `${IMAGE_URL}${cleanThumb.replace(/^\/+/, "")}`) : null
+        thumbnail: cleanThumb ? (cleanThumb.startsWith('http') ? cleanThumb : `${POST_IMAGE_URL}${cleanThumb.replace(/^\/+/, "")}`) : null
       };
     });
   } catch (error) {

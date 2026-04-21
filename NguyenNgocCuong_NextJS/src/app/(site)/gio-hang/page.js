@@ -18,10 +18,39 @@ import {
   User,
   Mail,
   Phone,
-  Home
+  Home,
+  Diamond,
+  Gem,
+  Sparkles,
+  Award,
+  Crown
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { createOrder } from "../api/apiOrder";
+
+// 💎 FloatingItem Luxury cho Giỏ hàng
+const FloatingItem = ({ icon: Icon, delay = 0, size = 20, top = "50%", left = "50%", springX, springY, factor = 1 }) => {
+  const x = useTransform(springX, [0, 1], [-30 * factor, 30 * factor]);
+  const y = useTransform(springY, [0, 1], [-30 * factor, 30 * factor]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0 }}
+      animate={{ 
+        opacity: [0, 0.4, 0.2, 0.4, 0],
+        scale: [0.8, 1.1, 0.8],
+        rotate: [0, 180, 0]
+      }}
+      style={{ top, left, x, y }}
+      transition={{ duration: 10, repeat: Infinity, delay, ease: "easeInOut" }}
+      className="absolute pointer-events-none"
+    >
+      <Icon size={size} className="text-amber-500/20" />
+    </motion.div>
+  );
+};
 
 export default function CartPage() {
   const { 
@@ -31,7 +60,8 @@ export default function CartPage() {
     decreaseQty, 
     clearCart, 
     cartInitialized,
-    navigateToCheckout 
+    navigateToCheckout,
+    getCartId
   } = useCart();
   
   const { user, isAuthenticated } = useAuth();
@@ -48,6 +78,21 @@ export default function CartPage() {
   const subtotal = cart.reduce((sum, p) => sum + p.price * p.qty, 0);
   const shippingFee = 0;
   const total = subtotal + shippingFee;
+
+  // 🎯 QUÁN TÍNH CHUỘT
+  const mouseX = useMotionValue(0.5);
+  const mouseY = useMotionValue(0.5);
+  const springX = useSpring(mouseX, { damping: 30, stiffness: 100 });
+  const springY = useSpring(mouseY, { damping: 30, stiffness: 100 });
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      mouseX.set(e.clientX / window.innerWidth);
+      mouseY.set(e.clientY / window.innerHeight);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
 
   // 🎯 THÊM KIỂM TRA CART INITIALIZED
   useEffect(() => {
@@ -71,9 +116,46 @@ export default function CartPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // 🎯 SỬA LẠI: Sử dụng navigateToCheckout để chuyển đến trang thanh toán
-  const handleCheckout = () => {
-    navigateToCheckout();
+  // 🎯 SỬA LẠI: Thực hiện tạo đơn hàng ngay tại đây để không làm đứt gãy luồng
+  const handleCheckout = async () => {
+    if (!isAuthenticated) {
+      toast.error("Vui lòng đăng nhập để thanh toán");
+      router.push("/dang-nhap?redirect=gio-hang");
+      return;
+    }
+    
+    if (!form.name || !form.phone || !form.address) {
+      toast.error("Vui lòng nhập đầy đủ thông tin giao hàng!");
+      return;
+    }
+
+    setLoading(true);
+    const orderPromise = createOrder({
+      userId: user.id,
+      cartId: getCartId(),
+      custName: form.name,
+      custPhone: form.phone,
+      shippingAddress: form.address,
+      customerNote: form.note || "",
+      paymentMethod: "COD",
+      shipMethod: "Giao hang nhanh"
+    });
+
+    toast.promise(orderPromise, {
+      loading: 'Đang niêm phong đơn hàng...',
+      success: '🎉 Chúc mừng! Đơn hàng của bạn đã được xác nhận.',
+      error: (err) => err.message || 'Lỗi khi đặt hàng!'
+    });
+
+    try {
+      const response = await orderPromise;
+      clearCart(); // Xóa giỏ hàng local và backend
+      router.push(`/thank-you?orderId=${response.order?.id || response.id}`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 🎯 HIỂN THỊ LOADING TRONG KHI CHƯA INITIALIZED
@@ -93,34 +175,60 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-12">
-          <div className="flex items-center space-x-4">
-            <Link
-              href="/"
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors group"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />
-              Tiếp tục mua sắm
-            </Link>
-          </div>
-
-          <div className="text-center">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-              Giỏ Hàng
-            </h1>
-            <p className="text-gray-500 mt-2">Quản lý sản phẩm và thanh toán</p>
-          </div>
-
-          {isAuthenticated && (
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Xin chào</p>
-              <p className="font-semibold text-green-600">{user?.name}</p>
-            </div>
-          )}
+    <div className="min-h-screen bg-neutral-50/50">
+      {/* LUXURY HERO SECTION */}
+      <section className="relative bg-neutral-950 pt-24 pb-20 overflow-hidden border-b border-amber-500/10 mb-12">
+        <div className="absolute inset-0">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/5 rounded-full blur-[120px]"></div>
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,_rgba(245,158,11,0.1),_transparent_70%)]"></div>
         </div>
+
+        {/* Floating Gems */}
+        <FloatingItem icon={Diamond} size={30} top="20%" left="15%" springX={springX} springY={springY} factor={1.2} />
+        <FloatingItem icon={Gem} size={25} top="60%" left="10%" springX={springX} springY={springY} factor={0.8} />
+        <FloatingItem icon={Sparkles} size={20} top="15%" left="80%" springX={springX} springY={springY} factor={1.5} />
+        <FloatingItem icon={Diamond} size={22} top="65%" left="85%" springX={springX} springY={springY} factor={0.6} />
+
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="flex flex-col items-center text-center">
+            <motion.div 
+               initial={{ opacity: 0, y: -20 }}
+               animate={{ opacity: 1, y: 0 }}
+               className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-500 px-4 py-1 rounded-full mb-6 border border-amber-500/20"
+            >
+              <ShoppingBag size={14} />
+              <span className="text-[10px] font-black uppercase tracking-[0.3em]">Premium Shopping Cart</span>
+            </motion.div>
+
+            <motion.h1 
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               className="text-5xl md:text-6xl font-serif text-white mb-6"
+            >
+              Giỏ Hàng <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-600 italic">Của Bạn</span>
+            </motion.h1>
+
+            <motion.div 
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               transition={{ delay: 0.3 }}
+               className="flex items-center gap-6 text-neutral-400 text-sm font-light"
+            >
+              <Link href="/" className="hover:text-amber-500 transition-colors flex items-center gap-2">
+                <ArrowLeft size={16} /> Tiếp tục mua sắm
+              </Link>
+              {isAuthenticated && (
+                <div className="flex items-center gap-2 border-l border-white/10 pl-6">
+                  <User size={16} className="text-amber-500" />
+                  Xin chào, <span className="text-white font-medium">{user?.name}</span>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {cart.length === 0 ? (
           <EmptyCartState />
@@ -170,92 +278,102 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Customer Information */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100">
-                  <div className="flex items-center space-x-3">
-                    <User className="w-6 h-6 text-blue-500" />
-                    <h2 className="text-xl font-semibold text-gray-900">
-                      Thông tin nhận hàng
-                    </h2>
+               {/* Customer Information - LUXURY FORM STYLE */}
+              <div className="bg-white rounded-2xl shadow-xl border border-neutral-100 overflow-hidden">
+                <div className="p-8 border-b border-neutral-100 bg-neutral-50/50">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+                      <User className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-neutral-900">Thông tin nhận hàng</h2>
+                      <p className="text-sm text-neutral-500">Mọi thông tin sẽ được bảo mật tuyệt đối</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-8 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                        <User className="w-4 h-4 mr-2" />
+                      <label className="flex items-center text-xs font-black text-neutral-500 uppercase tracking-widest mb-3">
                         Họ và tên *
                       </label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={form.name}
-                        onChange={handleChange}
-                        className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="Nhập họ và tên"
-                        required
-                      />
+                      <div className="relative group">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 group-focus-within:text-amber-500 transition-colors" />
+                        <input
+                          type="text"
+                          name="name"
+                          value={form.name}
+                          onChange={handleChange}
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl pl-12 pr-4 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium"
+                          placeholder="Nhập họ và tên"
+                          required
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                        <Mail className="w-4 h-4 mr-2" />
+                      <label className="flex items-center text-xs font-black text-neutral-500 uppercase tracking-widest mb-3">
                         Email *
                       </label>
+                      <div className="relative group">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 group-focus-within:text-amber-500 transition-colors" />
+                        <input
+                          type="email"
+                          name="email"
+                          value={form.email}
+                          onChange={handleChange}
+                          className="w-full bg-neutral-50 border border-neutral-200 rounded-xl pl-12 pr-4 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium"
+                          placeholder="Nhập email"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center text-xs font-black text-neutral-500 uppercase tracking-widest mb-3">
+                      Số điện thoại *
+                    </label>
+                    <div className="relative group">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 group-focus-within:text-amber-500 transition-colors" />
                       <input
-                        type="email"
-                        name="email"
-                        value={form.email}
+                        type="tel"
+                        name="phone"
+                        value={form.phone}
                         onChange={handleChange}
-                        className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="Nhập email"
+                        className="w-full bg-neutral-50 border border-neutral-200 rounded-xl pl-12 pr-4 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium"
+                        placeholder="Nhập số điện thoại"
                         required
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                      <Phone className="w-4 h-4 mr-2" />
-                      Số điện thoại *
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={form.phone}
-                      onChange={handleChange}
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="Nhập số điện thoại"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                      <Home className="w-4 h-4 mr-2" />
+                    <label className="flex items-center text-xs font-black text-neutral-500 uppercase tracking-widest mb-3">
                       Địa chỉ nhận hàng *
                     </label>
-                    <textarea
-                      name="address"
-                      value={form.address}
-                      onChange={handleChange}
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
-                      placeholder="Nhập địa chỉ chi tiết (số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố)"
-                      rows="3"
-                      required
-                    />
+                    <div className="relative group">
+                      <Home className="absolute left-4 top-5 w-4 h-4 text-neutral-400 group-focus-within:text-amber-500 transition-colors" />
+                      <textarea
+                        name="address"
+                        value={form.address}
+                        onChange={handleChange}
+                        className="w-full bg-neutral-50 border border-neutral-200 rounded-xl pl-12 pr-4 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium resize-none"
+                        placeholder="Số nhà, tên đường, phường/xã, quận/huyện..."
+                        rows="3"
+                        required
+                      />
+                    </div>
                     {user?.address && (
-                      <p className="text-xs text-green-600 mt-1">
-                        ✓ Đã tự động điền địa chỉ từ tài khoản của bạn
-                      </p>
+                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[11px] text-amber-600 mt-2 flex items-center gap-1 font-bold">
+                        <Shield size={12} /> HỆ THỐNG ĐÃ TỰ ĐỘNG ĐIỀN ĐỊA CHỈ ĐỊNH DANH CỦA BẠN
+                      </motion.p>
                     )}
                   </div>
 
                   <div>
-                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                      <MapPin className="w-4 h-4 mr-2" />
+                    <label className="flex items-center text-xs font-black text-neutral-500 uppercase tracking-widest mb-3">
                       Ghi chú đơn hàng (tuỳ chọn)
                     </label>
                     <textarea
@@ -263,8 +381,8 @@ export default function CartPage() {
                       value={form.note}
                       onChange={handleChange}
                       rows="3"
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
-                      placeholder="Ghi chú cho đơn hàng..."
+                      className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all font-medium resize-none shadow-inner"
+                      placeholder="Gợi ý: Chỉ dẫn giao hàng, quà biếu..."
                     />
                   </div>
                 </div>
@@ -355,120 +473,86 @@ function EmptyCartState() {
   );
 }
 
-// Component CartItem
+// Component CartItem Luxury Style
 function CartItem({ item, onIncrease, onDecrease, onRemove }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoading(false);
-  };
-
-  const handleImageLoad = () => {
-    setImageLoading(false);
-  };
-
-  const getFallbackImage = () => {
-    return "/images/placeholder.png";
-  };
-
   return (
-    <div className="p-6 hover:bg-gray-50 transition-colors">
-      <div className="flex items-start space-x-4">
-        {/* Product Image */}
-        <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
-          {imageError ? (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-200">
-              <ShoppingBag className="w-6 h-6 text-gray-400 mb-1" />
-              <span className="text-xs text-gray-500">No image</span>
-            </div>
-          ) : (
-            <>
-              {imageLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              )}
-              <img
-                src={item.image || getFallbackImage()}
-                alt={item.name}
-                className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'
-                  }`}
-                onError={handleImageError}
-                onLoad={handleImageLoad}
-                loading="lazy"
-              />
-            </>
-          )}
+    <motion.div 
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="p-8 hover:bg-neutral-50/80 transition-all border-b border-neutral-100 last:border-0 group"
+    >
+      <div className="flex items-center space-x-6">
+        {/* Product Image - Jewelry Frame */}
+        <div className="relative w-28 h-28 rounded-2xl overflow-hidden flex-shrink-0 bg-neutral-100 border border-neutral-200 group-hover:border-amber-500/30 transition-colors shadow-inner">
+          <img
+            src={item.image || "/images/placeholder.png"}
+            alt={item.name}
+            className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+            onLoad={() => setImageLoading(false)}
+            onError={() => setImageError(true)}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-neutral-900/10 to-transparent"></div>
         </div>
 
         {/* Product Info */}
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1">
-            {item.name}
-          </h3>
-          {item.variant && (
-            <p className="text-sm text-gray-500 mb-2">Biến thể: {item.variant}</p>
-          )}
+        <div className="flex-1 min-w-0 py-2">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="font-serif text-lg text-neutral-900 line-clamp-1 group-hover:text-amber-600 transition-colors uppercase tracking-tight">
+              {item.name}
+            </h3>
+            <button
+              onClick={onRemove}
+              className="p-2 text-neutral-300 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="flex flex-wrap gap-2 mb-4">
+            {item.variant && (
+              <span className="text-[10px] bg-neutral-100 text-neutral-500 px-2 py-0.5 rounded font-black uppercase tracking-widest">{item.variant}</span>
+            )}
+            {item.attributes_full?.map((attr, idx) => (
+              <span key={idx} className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded font-black uppercase tracking-widest">
+                {attr.attribute_name}: {attr.value}
+              </span>
+            ))}
+          </div>
 
-          {item.attributes_full && item.attributes_full.length > 0 && (
-            <div className="text-xs text-gray-500 mb-2">
-              {item.attributes_full.map((attr, index) => (
-                <span key={index} className="mr-2">
-                  {attr.attribute_name}: {attr.value}
-                </span>
-              ))}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4 bg-neutral-100/50 p-1 rounded-full border border-neutral-200">
+              <button
+                onClick={onDecrease}
+                className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:text-amber-600 shadow-sm active:scale-90 transition-all border border-neutral-100"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <span className="w-6 text-center font-black text-neutral-700 text-sm">{item.qty}</span>
+              <button
+                onClick={onIncrease}
+                className="w-8 h-8 rounded-full bg-white flex items-center justify-center hover:text-amber-600 shadow-sm active:scale-90 transition-all border border-neutral-100"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
             </div>
-          )}
-
-          <p className="text-lg font-bold text-green-600">
-            {item.price.toLocaleString("vi-VN")}₫
-          </p>
+            
+            <div className="text-right">
+              <p className="text-[10px] text-neutral-400 font-black uppercase tracking-widest mb-1">Thành tiền</p>
+              <p className="text-xl font-serif font-bold text-neutral-900">
+                {(item.price * item.qty).toLocaleString("vi-VN")}₫
+              </p>
+            </div>
+          </div>
         </div>
-
-        {/* Quantity Controls */}
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={onDecrease}
-            className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 active:scale-95"
-          >
-            <Minus className="w-4 h-4 text-gray-600" />
-          </button>
-
-          <span className="w-12 text-center font-semibold text-gray-900 text-lg">
-            {item.qty}
-          </span>
-
-          <button
-            onClick={onIncrease}
-            className="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 active:scale-95"
-          >
-            <Plus className="w-4 h-4 text-gray-600" />
-          </button>
-        </div>
-
-        {/* Remove Button */}
-        <button
-          onClick={onRemove}
-          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
-        >
-          <Trash2 className="w-5 h-5" />
-        </button>
       </div>
-
-      {/* Subtotal */}
-      <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
-        <span className="text-sm text-gray-500">Thành tiền:</span>
-        <span className="font-semibold text-green-600">
-          {(item.price * item.qty).toLocaleString("vi-VN")}₫
-        </span>
-      </div>
-    </div>
+    </motion.div>
   );
 }
 
-// Component OrderSummary (Giữ nguyên như bạn đã có)
+// Component OrderSummary Luxury Upgrade
 function OrderSummary({ 
   subtotal, 
   shippingFee, 
@@ -479,162 +563,86 @@ function OrderSummary({
   onCheckout,
   showCheckoutButton = true,
   showLoginButton = true,
-  compact = false,
-  paymentMethod = "cod"
+  compact = false
 }) {
   const { navigateToCheckout, canCheckout } = useCart();
-  const router = useRouter();
-
-  const handleNavigateToCheckout = () => {
-    navigateToCheckout();
-  };
-
-  const getPaymentMethodText = () => {
-    switch (paymentMethod) {
-      case "cod": return "Thanh toán khi nhận hàng";
-      case "bank": return "Chuyển khoản ngân hàng";
-      case "momo": return "Ví MoMo";
-      default: return "Thanh toán khi nhận hàng";
-    }
-  };
-
-  const discount = 0;
-  const finalTotal = total - discount;
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 ${!compact ? 'sticky top-6' : ''}`}>
-      <h2 className={`font-semibold text-gray-900 mb-6 ${compact ? 'text-lg' : 'text-xl'}`}>
-        {compact ? 'Tổng đơn hàng' : 'Tóm tắt đơn hàng'}
-      </h2>
+    <div className={`bg-neutral-900 rounded-3xl shadow-2xl p-8 border border-white/10 text-white ${!compact ? 'sticky top-6' : ''}`}>
+      <div className="flex items-center gap-3 mb-8 pb-6 border-b border-white/5">
+        <Award className="text-amber-500 w-6 h-6" />
+        <h2 className="font-serif text-2xl">Đại Lộ Thanh Toán</h2>
+      </div>
 
-      <div className={`space-y-3 ${compact ? 'mb-4' : 'mb-6'}`}>
-        <div className="flex justify-between text-gray-600">
+      <div className="space-y-4 mb-8">
+        <div className="flex justify-between text-neutral-400 font-light">
           <span>Tạm tính ({cartLength} sản phẩm)</span>
-          <span className="font-medium">{subtotal.toLocaleString("vi-VN")}₫</span>
+          <span className="font-medium text-white">{subtotal.toLocaleString("vi-VN")}₫</span>
         </div>
 
-        <div className="flex justify-between text-gray-600">
-          <span>Phí vận chuyển</span>
-          <span className="text-green-600 font-semibold">
-            {shippingFee === 0 ? 'Miễn phí' : `${shippingFee.toLocaleString("vi-VN")}₫`}
+        <div className="flex justify-between text-neutral-400 font-light">
+          <span>Phí bảo hiểm vận chuyển</span>
+          <span className="text-emerald-400 font-bold uppercase tracking-widest text-[10px]">
+            {shippingFee === 0 ? 'Đặc quyền Miễn phí' : `${shippingFee.toLocaleString("vi-VN")}₫`}
           </span>
         </div>
 
-        {discount > 0 && (
-          <div className="flex justify-between text-red-600">
-            <span>Giảm giá</span>
-            <span className="font-semibold">-{discount.toLocaleString("vi-VN")}₫</span>
+        <div className="pt-6 border-t border-white/5">
+          <div className="flex justify-between items-end">
+            <div>
+              <p className="text-[10px] text-neutral-500 font-black uppercase tracking-[0.3em] mb-1">Tổng giá trị</p>
+              <p className="text-3xl font-serif font-bold text-amber-500">
+                {total.toLocaleString("vi-VN")}₫
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-neutral-500 font-black uppercase tracking-[0.3em] mb-1">Thuế VAT</p>
+              <p className="text-sm text-neutral-300 italic">Đã bao gồm</p>
+            </div>
           </div>
-        )}
-
-        <div className="border-t border-gray-200 pt-3">
-          <div className="flex justify-between items-center mb-2">
-            <span className={`font-semibold text-gray-900 ${compact ? 'text-lg' : 'text-xl'}`}>
-              {compact ? 'Thành tiền' : 'Tổng cộng'}
-            </span>
-            <span className={`font-bold text-green-600 ${compact ? 'text-xl' : 'text-2xl'}`}>
-              {finalTotal.toLocaleString("vi-VN")}₫
-            </span>
-          </div>
-
-          {paymentMethod && !compact && (
-            <p className="text-sm text-gray-500">
-              Phương thức: {getPaymentMethodText()}
-            </p>
-          )}
         </div>
       </div>
 
       {!isAuthenticated && showLoginButton && (
-        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-          <p className="text-yellow-700 text-sm text-center">
-            🔐 Vui lòng{" "}
-            <Link 
-              href="/dang-nhap" 
-              className="font-semibold underline hover:text-yellow-800 transition-colors"
-            >
-              đăng nhập
-            </Link>{" "}
-            để thanh toán
+        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+          <p className="text-amber-200 text-[11px] text-center font-medium leading-relaxed">
+            Mở khóa đặc quyền thanh toán bằng cách{" "}
+            <Link href="/dang-nhap" className="text-amber-500 font-black underline underline-offset-4">Đăng nhập</Link>
           </p>
         </div>
       )}
 
       {showCheckoutButton && (
-        <>
+        <div className="space-y-4">
           <button
-            onClick={onCheckout || handleNavigateToCheckout}
+            onClick={onCheckout || navigateToCheckout}
             disabled={loading || !isAuthenticated || !canCheckout()}
-            className={`w-full py-4 rounded-xl font-semibold text-lg shadow-lg transition-all duration-200 ${
+            className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] transition-all duration-500 relative overflow-hidden group ${
               !isAuthenticated || !canCheckout()
-                ? "bg-gray-300 cursor-not-allowed text-gray-500"
-                : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-green-200 hover:shadow-xl transform hover:-translate-y-0.5"
+                ? "bg-neutral-800 text-neutral-600 grayscale cursor-not-allowed"
+                : "bg-amber-500 text-neutral-950 hover:shadow-[0_0_40px_rgba(245,158,11,0.4)] hover:-translate-y-1"
             }`}
           >
-            {loading ? (
-              <div className="flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
-                Đang xử lý...
-              </div>
-            ) : (
-              <div className="flex items-center justify-center">
-                <CreditCard className="w-5 h-5 mr-3" />
-                {compact ? 'Thanh toán' : 'Thanh toán an toàn'}
-              </div>
-            )}
+            <span className="relative z-10 flex items-center justify-center gap-3">
+              {loading ? "Đang xử lý..." : "Xác nhận đặt hàng"}
+              <CreditCard size={16} />
+            </span>
+            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
           </button>
-
-          {!isAuthenticated && showLoginButton && (
-            <Link
-              href="/dang-nhap"
-              className="block w-full mt-3 py-4 text-center bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
-            >
-              Đăng nhập để thanh toán
-            </Link>
-          )}
-        </>
-      )}
-
-      {compact && (
-        <Link
-          href="/gio-hang"
-          className="block w-full mt-3 py-3 text-center border-2 border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 rounded-xl font-semibold transition-all duration-200"
-        >
-          Xem giỏ hàng
-        </Link>
-      )}
-
-      {!compact && (
-        <p className="text-xs text-gray-500 text-center mt-4">
-          🔒 Bằng cách đặt hàng, bạn đồng ý với{" "}
-          <Link href="/dieu-khoan" className="underline hover:text-gray-700">
-            Điều khoản dịch vụ
-          </Link>{" "}
-          của chúng tôi
-        </p>
-      )}
-
-      {!compact && (
-        <div className="mt-6 pt-6 border-t border-gray-100">
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="flex items-center space-x-2 text-gray-500">
-              <Shield className="w-4 h-4 text-green-500" />
-              <span>Bảo mật</span>
-            </div>
-            <div className="flex items-center space-x-2 text-gray-500">
-              <Truck className="w-4 h-4 text-blue-500" />
-              <span>Miễn phí ship</span>
-            </div>
-            <div className="flex items-center space-x-2 text-gray-500">
-              <CreditCard className="w-4 h-4 text-purple-500" />
-              <span>Đa dạng TT</span>
-            </div>
-            <div className="flex items-center space-x-2 text-gray-500">
-              <svg className="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-              </svg>
-              <span>Hỗ trợ 24/7</span>
-            </div>
+          
+          <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/5 opacity-50 grayscale hover:grayscale-0 transition-all duration-700">
+             <div className="flex flex-col items-center gap-1">
+                <Shield size={14} className="text-amber-500" />
+                <span className="text-[8px] uppercase font-black">Secure</span>
+             </div>
+             <div className="flex flex-col items-center gap-1 border-x border-white/5">
+                <Truck size={14} className="text-amber-500" />
+                <span className="text-[8px] uppercase font-black">Luxury Ship</span>
+             </div>
+             <div className="flex flex-col items-center gap-1">
+                <Crown size={14} className="text-amber-500" />
+                <span className="text-[8px] uppercase font-black">Premium</span>
+             </div>
           </div>
         </div>
       )}

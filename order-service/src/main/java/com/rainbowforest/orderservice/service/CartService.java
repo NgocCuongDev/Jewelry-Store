@@ -13,4 +13,5 @@ public interface CartService {
     public boolean checkIfItemIsExist(String cartId, Long productId);
     public List<Item> getAllItemsFromCart(String cartId);
     public void deleteCart(String cartId);
+    public void clearCart(String cartId);
 }

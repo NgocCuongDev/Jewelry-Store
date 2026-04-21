@@ -1,5 +1,5 @@
 import axios from "axios";
-import { IMAGE_URL, API_URL } from "../../config";
+import { CATALOG_IMAGE_URL, API_URL } from "../../config";
 
 // Tạo axios instance dùng chung gọi qua Gateway
 const api = axios.create({
@@ -19,8 +19,8 @@ const formatProduct = (p) => {
   }
 
   const finalImageUrl = cleanImageUrl 
-    ? (cleanImageUrl.startsWith("http") ? cleanImageUrl : IMAGE_URL + cleanImageUrl.replace(/^\/+/, ""))
-    : IMAGE_URL + "no-image.png";
+    ? (cleanImageUrl.startsWith("http") ? cleanImageUrl : CATALOG_IMAGE_URL + cleanImageUrl.replace(/^\/+/, ""))
+    : CATALOG_IMAGE_URL + "no-image.png";
 
   return {
     id: p.id,

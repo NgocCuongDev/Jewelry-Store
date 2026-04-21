@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/images")
+@RequestMapping("/product-images-api")
 public class ImageUploadController {
 
     private static final String UPLOAD_DIR = "src/main/resources/static/images/";

@@ -112,18 +112,19 @@ export default function OrdersPage() {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && user && user.id) {
       fetchOrders();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await getOrders();
+      // Backend yêu cầu userId để lọc đơn hàng của riêng user đó
+      const response = await getOrders({ userId: user.id });
       console.log("API Response:", response);
 
-      const ordersData = response.data || response.orders || [];
+      const ordersData = response.orders || [];
       setOrders(ordersData);
 
       // 🎯 Tính toán tổng số trang
@@ -138,16 +139,16 @@ export default function OrdersPage() {
     }
   };
 
-  // Map status number to text
+  // Map status string from Backend to UI short status
   const getStatusText = (status) => {
     const statusMap = {
-      1: 'pending',
-      2: 'processing', 
-      3: 'shipping',
-      4: 'completed',
-      5: 'cancelled'
+      'PAYMENT_EXPECTED': 'pending',
+      'PROCESSING': 'processing', 
+      'SHIPPING': 'shipping',
+      'COMPLETED': 'completed',
+      'CANCELLED': 'cancelled'
     };
-    return statusMap[status] || 'pending';
+    return statusMap[status] || status || 'pending';
   };
 
   const getStatusInfo = (status) => {
@@ -203,8 +204,15 @@ export default function OrdersPage() {
   // Format order date
   const formatOrderDate = (dateString) => {
     if (!dateString) return 'Chưa có ngày';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
+    // Spring Boot trả về dạng array [2024, 4, 15, 10, 30] hoặc string ISO
+    let date;
+    if (Array.isArray(dateString)) {
+      date = new Date(dateString[0], dateString[1] - 1, dateString[2], dateString[3], dateString[4]);
+    } else {
+      date = new Date(dateString);
+    }
+    
+    return date.toLocaleString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -221,22 +229,22 @@ export default function OrdersPage() {
 
   // Get total items count
   const getTotalItems = (order) => {
-    if (!order.order_items || !Array.isArray(order.order_items)) return 0;
-    return order.order_items.reduce((total, item) => total + (item.quantity || 1), 0);
+    if (!order.items || !Array.isArray(order.items)) return 0;
+    return order.items.reduce((total, item) => total + (item.quantity || 1), 0);
   };
 
   // Get product preview with images
   const getProductPreview = (order) => {
-    if (!order.order_items || !Array.isArray(order.order_items) || order.order_items.length === 0) {
+    if (!order.items || !Array.isArray(order.items) || order.items.length === 0) {
       return [{ name: "Đang cập nhật", initial: "?", image: null }];
     }
 
-    return order.order_items.slice(0, 4).map(item => ({
-      name: item.product_name || "Sản phẩm",
-      initial: (item.product_name || "S").charAt(0).toUpperCase(),
-      price: item.price,
+    return order.items.slice(0, 4).map(item => ({
+      name: item.product?.productName || "Sản phẩm",
+      initial: (item.product?.productName || "S").charAt(0).toUpperCase(),
+      price: item.product?.price,
       quantity: item.quantity,
-      image: getProductImage(item)
+      image: item.product?.imageUrl
     }));
   };
 
@@ -522,8 +530,7 @@ export default function OrdersPage() {
                 const statusInfo = getStatusInfo(order.status);
                 const totalItems = getTotalItems(order);
                 const productPreview = getProductPreview(order);
-                const hasValidItems = order.order_items && order.order_items.length > 0 &&
-                  order.order_items.some(item => item.product_name && item.product_name !== 'Sản phẩm');
+                const hasValidItems = order.items && order.items.length > 0;
 
                 return (
                   <div
@@ -551,7 +558,7 @@ export default function OrdersPage() {
                           <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                             <span className="flex items-center gap-2">
                               <span>📅</span>
-                              {formatOrderDate(order.created_at)}
+                              {formatOrderDate(order.orderedDate)}
                             </span>
                             <span className="flex items-center gap-2">
                               <span>📦</span>
@@ -559,28 +566,28 @@ export default function OrdersPage() {
                             </span>
                             <span className="flex items-center gap-2">
                               <span>📞</span>
-                              {order.phone || 'Chưa có SĐT'}
+                              {order.custPhone || 'Chưa có SĐT'}
                             </span>
                           </div>
-                          {order.address && (
+                          {order.shippingAddress && (
                             <div className="mt-2 text-sm text-gray-600">
                               <span className="flex items-start gap-2">
                                 <span>🏠</span>
-                                <span className="flex-1">{order.address}</span>
+                                <span className="flex-1">{order.shippingAddress}</span>
                               </span>
                             </div>
                           )}
                           {/* 🎯 HIỂN THỊ LÝ DO HỦY NẾU CÓ */}
-                          {order.status === 5 && order.cancel_reason && (
+                          {order.status === 'CANCELLED' && (
                             <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                               <div className="flex items-start gap-2">
                                 <span className="text-red-500 mt-0.5">🗑️</span>
                                 <div>
                                   <p className="text-red-700 text-sm font-medium">Đã hủy</p>
-                                  <p className="text-red-600 text-xs">{order.cancel_reason}</p>
-                                  {order.cancelled_at && (
+                                  <p className="text-red-600 text-xs">{order.customerNote || "Người dùng yêu cầu hủy"}</p>
+                                  {order.updatedAt && (
                                     <p className="text-red-500 text-xs mt-1">
-                                      {formatOrderDate(order.cancelled_at)}
+                                      {formatOrderDate(order.updatedAt)}
                                     </p>
                                   )}
                                 </div>
@@ -591,7 +598,7 @@ export default function OrdersPage() {
 
                         <div className="text-right">
                           <p className="text-2xl font-bold text-gray-900 mb-1">
-                            {formatCurrency(order.amount)}
+                            {formatCurrency(order.total)}
                           </p>
                           <p className="text-sm text-gray-500">Tổng giá trị</p>
                         </div>
@@ -631,48 +638,46 @@ export default function OrdersPage() {
                         {/* Product Details */}
                         <div className="space-y-3">
                           {hasValidItems ? (
-                            order.order_items.slice(0, 3).map((item, index) => (
-                              item.product_name && item.product_name !== 'Sản phẩm' && (
-                                <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                                  {/* Product Image */}
-                                  <div className="flex-shrink-0 w-16 h-16 bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
-                                    <ProductImage
-                                      src={getProductImage(item)}
-                                      alt={item.product_name}
-                                      className="object-cover w-full h-full"
-                                      fallback={
-                                        <span className="text-lg font-medium text-gray-400">
-                                          {(item.product_name || "S").charAt(0).toUpperCase()}
-                                        </span>
-                                      }
-                                    />
-                                  </div>
-
-                                  {/* Product Info */}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-gray-900 truncate">
-                                      {item.product_name}
-                                    </p>
-                                    <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                                      <span>Số lượng: {item.quantity}</span>
-                                      {item.price > 0 && (
-                                        <span className="font-medium">
-                                          {formatCurrency(item.price)}/sản phẩm
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Item Total */}
-                                  {item.price > 0 && (
-                                    <div className="text-right">
-                                      <p className="font-bold text-gray-900 text-lg">
-                                        {formatCurrency(item.price * item.quantity)}
-                                      </p>
-                                    </div>
-                                  )}
+                            order.items.slice(0, 3).map((item, index) => (
+                              <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+                                {/* Product Image */}
+                                <div className="flex-shrink-0 w-16 h-16 bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                                  <ProductImage
+                                    src={item.product?.imageUrl}
+                                    alt={item.product?.productName}
+                                    className="object-cover w-full h-full"
+                                    fallback={
+                                      <span className="text-lg font-medium text-gray-400">
+                                        {(item.product?.productName || "S").charAt(0).toUpperCase()}
+                                      </span>
+                                    }
+                                  />
                                 </div>
-                              )
+
+                                {/* Product Info */}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 truncate">
+                                    {item.product?.productName}
+                                  </p>
+                                  <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                                    <span>Số lượng: {item.quantity}</span>
+                                    {item.product?.price > 0 && (
+                                      <span className="font-medium">
+                                        {formatCurrency(item.product?.price)}/sản phẩm
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Item Total */}
+                                {item.subTotal > 0 && (
+                                  <div className="text-right">
+                                    <p className="font-bold text-gray-900 text-lg">
+                                      {formatCurrency(item.subTotal)}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
                             ))
                           ) : (
                             <div className="text-center text-gray-500 py-6 bg-gray-50 rounded-xl">
@@ -682,11 +687,11 @@ export default function OrdersPage() {
                           )}
 
                           {/* Show more products indicator */}
-                          {order.order_items.length > 3 && (
+                          {order.items.length > 3 && (
                             <div className="text-center text-gray-500 bg-gray-100 py-3 rounded-lg">
                               <span className="flex items-center justify-center gap-2">
                                 <span>📋</span>
-                                Và {order.order_items.length - 3} sản phẩm khác
+                                Và {order.items.length - 3} sản phẩm khác
                               </span>
                             </div>
                           )}

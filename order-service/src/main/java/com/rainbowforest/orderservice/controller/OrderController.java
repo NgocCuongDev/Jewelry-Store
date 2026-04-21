@@ -30,26 +30,61 @@ public class OrderController {
     private CartService cartService;
 
     @Autowired
+    private com.rainbowforest.orderservice.repository.UserRepository userRepository;
+
+    @Autowired
     private HeaderGenerator headerGenerator;
     
+    // Cache đơn giản để chống trùng lặp (Idempotency) - Key: CartId, Value: Timestamp
+    private static final java.util.Map<String, Long> idempotencyCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long IDEMPOTENCY_WINDOW_MS = 30000; // 30 giây
+
     @PostMapping(value = "/order/{userId}")
     public ResponseEntity<Order> saveOrder(
     		@PathVariable("userId") Long userId,
-    		@RequestHeader(value = "Cookie", required = false) String cartId,
+    		@RequestHeader(value = "Cart-Id", required = false) String cartId,
+            @RequestBody(required = false) com.rainbowforest.orderservice.http.OrderRequest orderRequest,
     		HttpServletRequest request){
     	if (cartId == null) cartId = "default-cart";
+        
+        // --- CHỐNG TRÙNG LẶP (IDEMPOTENCY) ---
+        long currentTime = System.currentTimeMillis();
+        if (idempotencyCache.containsKey(cartId)) {
+            long lastTime = idempotencyCache.get(cartId);
+            if (currentTime - lastTime < IDEMPOTENCY_WINDOW_MS) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).build();
+            }
+        }
+        idempotencyCache.put(cartId, currentTime);
+
         List<Item> cart = cartService.getAllItemsFromCart(cartId);
-        User user = userClient.getUserById(userId);   
-        if(cart != null && user != null) {
-        	Order order = this.createOrder(cart, user);
+        
+        // 1. Lấy thông tin user từ User-Service (Auth)
+        User userFromAuth = userClient.getUserById(userId);   
+        
+        if(cart != null && userFromAuth != null) {
+            // 2. Kiểm tra xem User này đã tồn tại trong DB cục bộ chưa
+            User finalUser = userRepository.findById(userId).orElse(null);
+            
+            if (finalUser == null) {
+                // Nếu chưa có, lưu mới vào module Order
+                finalUser = userRepository.save(userFromAuth);
+            } else {
+                // Nếu đã có, cập nhật lại tên (đề phòng đổi tên bên Auth)
+                finalUser.setUserName(userFromAuth.getUserName());
+                finalUser = userRepository.save(finalUser);
+            }
+
+        	Order order = this.createOrder(cart, finalUser, orderRequest);
         	try{
                 orderService.saveOrder(order);
-                cartService.deleteCart(cartId);
+                cartService.clearCart(cartId);
                 return new ResponseEntity<Order>(
                 		order, 
                 		headerGenerator.getHeadersForSuccessPostMethod(request, order.getId()),
                 		HttpStatus.CREATED);
             }catch (Exception ex){
+                idempotencyCache.remove(cartId);
                 ex.printStackTrace();
                 return new ResponseEntity<Order>(
                 		headerGenerator.getHeadersForError(),
@@ -71,7 +106,23 @@ public class OrderController {
                 HttpStatus.OK);
     }
 
-    @GetMapping("/orders/{id}")
+    @GetMapping("/order")
+    public ResponseEntity<List<Order>> getOrdersByFiltering(@RequestParam(value = "userId", required = false) Long userId) {
+        System.out.println("🔍 Receiving request for orders with userId: " + userId);
+        List<Order> orders;
+        if (userId != null) {
+            orders = orderService.getOrdersByUserId(userId);
+        } else {
+            // Bảo mật: Không trả về đơn hàng nếu không có userId
+            orders = new java.util.ArrayList<>();
+        }
+        return new ResponseEntity<List<Order>>(
+                orders,
+                headerGenerator.getHeadersForSuccessGetMethod(),
+                HttpStatus.OK);
+    }
+
+    @GetMapping({"/orders/{id}", "/order/{id}"})
     public ResponseEntity<Order> getOrderById(@PathVariable("id") Long id) {
         Order order = orderService.getOrderById(id);
         if (order != null) {
@@ -85,7 +136,22 @@ public class OrderController {
                 HttpStatus.NOT_FOUND);
     }
 
-    @PutMapping("/orders/{id}/status")
+    @PostMapping("/order/{id}/cancel")
+    public ResponseEntity<Order> cancelOrder(@PathVariable("id") Long id, @RequestBody(required = false) java.util.Map<String, String> payload) {
+        String reason = payload != null ? payload.get("cancel_reason") : "Người dùng hủy";
+        Order order = orderService.cancelOrder(id, reason);
+        if (order != null) {
+            return new ResponseEntity<Order>(
+                    order,
+                    headerGenerator.getHeadersForSuccessGetMethod(),
+                    HttpStatus.OK);
+        }
+        return new ResponseEntity<Order>(
+                headerGenerator.getHeadersForError(),
+                HttpStatus.NOT_FOUND);
+    }
+
+    @PutMapping({"/orders/{id}/status", "/order/{id}/status"})
     public ResponseEntity<Order> updateOrderStatus(@PathVariable("id") Long id, @RequestParam("status") String status) {
         Order order = orderService.updateOrderStatus(id, status);
         if (order != null) {
@@ -99,21 +165,50 @@ public class OrderController {
                 HttpStatus.NOT_FOUND);
     }
     
-    private Order createOrder(List<Item> cart, User user) {
+    private Order createOrder(List<Item> cart, User user, com.rainbowforest.orderservice.http.OrderRequest orderRequest) {
         Order order = new Order();
-        order.setItems(cart);
+        
+        // --- LOGIC HỢP NHẤT SẢN PHẨM ---
+        // Nếu trong giỏ hàng có nhiều dòng cho cùng 1 sản phẩm, chúng ta gộp lại thành 1 dòng duy nhất
+        java.util.Map<Long, Item> consolidatedMap = new java.util.HashMap<>();
+        for (Item item : cart) {
+            Long productId = item.getProduct().getCatalogId();
+            if (consolidatedMap.containsKey(productId)) {
+                Item existing = consolidatedMap.get(productId);
+                existing.setQuantity(existing.getQuantity() + item.getQuantity());
+                existing.setSubTotal(existing.getSubTotal().add(item.getSubTotal()));
+            } else {
+                // Tạo một bản sao để không ảnh hưởng đến dữ liệu gốc của giỏ hàng
+                Item newItem = new Item(item.getQuantity(), item.getProduct(), item.getSubTotal());
+                consolidatedMap.put(productId, newItem);
+            }
+        }
+        
+        List<Item> consolidatedItems = new java.util.ArrayList<>(consolidatedMap.values());
+        order.setItems(consolidatedItems);
         order.setUser(user);
-        order.setTotal(OrderUtilities.countTotalPrice(cart));
+        order.setTotal(OrderUtilities.countTotalPrice(consolidatedItems));
         order.setOrderedDate(LocalDateTime.now());
         order.setStatus("PAYMENT_EXPECTED");
         
-        // Set default shipping/customer info
-        order.setShippingAddress("So 1 Dai Co Viet, Bach Khoa, Hai Ba Trung, Ha Noi");
-        order.setCustName(user.getUserName()); // Using userName as dummy custName
-        order.setCustPhone("0987654321");
-        order.setPaymentMethod("COD");
-        order.setShipMethod("Giao hang nhanh");
-        order.setCustomerNote("Giao gio hanh chinh");
+        if (orderRequest != null) {
+            order.setShippingAddress(orderRequest.getShippingAddress());
+            order.setCustName(orderRequest.getCustName());
+            order.setCustPhone(orderRequest.getCustPhone());
+            order.setCustEmail(orderRequest.getCustEmail());
+            order.setPaymentMethod(orderRequest.getPaymentMethod() != null ? orderRequest.getPaymentMethod() : "COD");
+            order.setShipMethod(orderRequest.getShipMethod() != null ? orderRequest.getShipMethod() : "Giao hang nhanh");
+            order.setCustomerNote(orderRequest.getCustomerNote());
+        } else {
+            // Set default shipping/customer info
+            order.setShippingAddress("So 1 Dai Co Viet, Bach Khoa, Hai Ba Trung, Ha Noi");
+            order.setCustName(user.getUserName());
+            order.setCustPhone("0987654321");
+            order.setCustEmail("guest@example.com");
+            order.setPaymentMethod("COD");
+            order.setShipMethod("Giao hang nhanh");
+            order.setCustomerNote("Giao gio hanh chinh");
+        }
         
         return order;
     }

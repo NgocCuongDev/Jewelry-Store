@@ -1,6 +1,8 @@
 package com.rainbowforest.orderservice.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
@@ -95,6 +97,23 @@ public class Product {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    @JsonSetter("category")
+    public void setCategoryFromJson(JsonNode categoryNode) {
+        if (categoryNode != null) {
+            if (categoryNode.isObject()) {
+                if (categoryNode.has("categoryName")) {
+                    this.category = categoryNode.get("categoryName").asText();
+                } else if (categoryNode.has("name")) {
+                    this.category = categoryNode.get("name").asText();
+                } else {
+                    this.category = categoryNode.toString();
+                }
+            } else if (categoryNode.isValueNode()) {
+                this.category = categoryNode.asText();
+            }
+        }
     }
 
     public int getAvailability() {

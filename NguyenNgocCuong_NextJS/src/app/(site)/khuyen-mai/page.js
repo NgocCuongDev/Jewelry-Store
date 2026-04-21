@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
   Filter,
   Search,
@@ -24,6 +24,33 @@ import ProductCard from "../_components/ProductCard";
 import { getSaleProducts } from "../api/apiProduct";
 import { getCategories } from "../api/apiCategory";
 
+// 💎 Sub-component cho vật thể bay - Phiên bản tối ưu Liquid Fluid
+const FloatingItem = ({ icon: Icon, delay = 0, size = 20, top = "50%", left = "50%", springX, springY, factor = 1 }) => {
+  const x = useTransform(springX, [0, 1], [-40 * factor, 40 * factor]);
+  const y = useTransform(springY, [0, 1], [-40 * factor, 40 * factor]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0 }}
+      animate={{ 
+        opacity: [0, 0.7, 0.4, 0.7, 0], // Shimmer effect
+        scale: [0.8, 1.2, 0.8],
+        rotate: [0, 90, 0]
+      }}
+      style={{ top, left, x, y }}
+      transition={{ 
+        duration: 8 + Math.random() * 5, 
+        repeat: Infinity, 
+        delay,
+        ease: "easeInOut" 
+      }}
+      className="absolute pointer-events-none"
+    >
+      <Icon size={size} className="text-amber-400/50 drop-shadow-[0_0_12px_rgba(245,158,11,0.4)]" />
+    </motion.div>
+  );
+};
+
 export default function PremiumSaleProductsPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,11 +60,27 @@ export default function PremiumSaleProductsPage() {
   const [categories, setCategories] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
 
+  // 🎯 QUÁN TÍNH CHUỘT (MOUSE INERTIA)
+  const mouseX = useMotionValue(0.5);
+  const mouseY = useMotionValue(0.5);
+  const springConfig = { damping: 30, stiffness: 100, mass: 0.5 };
+  const springX = useSpring(mouseX, springConfig);
+  const springY = useSpring(mouseY, springConfig);
+
   useEffect(() => {
     loadData();
     const handleScroll = () => setIsScrolled(window.scrollY > 100);
+    const handleMouseMove = (e) => {
+      mouseX.set(e.clientX / window.innerWidth);
+      mouseY.set(e.clientY / window.innerHeight);
+    };
+
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
   }, []);
 
   const loadData = async () => {
@@ -108,54 +151,72 @@ export default function PremiumSaleProductsPage() {
 
   return (
     <div className="min-h-screen bg-[#fafafa]">
-      {/* LUXURY STICKY NAV */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${isScrolled ? 'bg-white/90 backdrop-blur-md shadow-lg py-4' : 'bg-transparent py-6'}`}>
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-amber-500 p-2 rounded-lg"><Gem className="text-white w-5 h-5" /></div>
-            <span className="font-serif text-xl font-bold tracking-tighter text-neutral-900">NNC JEWELS</span>
-          </div>
-          <div className="relative hidden md:block w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Tìm kiếm tuyệt tác..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/50 border border-amber-100 rounded-full pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none"
-            />
-          </div>
-        </div>
-      </nav>
 
-      {/* HERO SECTION - GOLD DARK THEME */}
-      <section className="relative bg-neutral-900 pt-32 pb-48 overflow-hidden">
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-500/20 via-transparent to-transparent"></div>
+
+      {/* HERO SECTION - COMPACT LUXURY GOLD SPOTLIGHT - Đã tinh gọn */}
+      <section className="relative bg-neutral-950 pt-28 pb-32 overflow-hidden">
+        {/* Glow Effects - Đã tăng cường độ */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[1200px] bg-amber-500/20 rounded-full blur-[140px] opacity-60"></div>
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,_rgba(245,158,11,0.25),_transparent_60%)]"></div>
+          
+          {/* Subtle Grid Pattern */}
+          <div className="absolute inset-0 opacity-[0.05] bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] shadow-[inset_0_0_100px_rgba(0,0,0,0.8)]"></div>
         </div>
+
+        {/* Floating Luxury Elements - Parallax Mượt mà */}
+        <FloatingItem icon={Diamond} size={40} top="15%" left="12%" delay={0} springX={springX} springY={springY} factor={1.2} />
+        <FloatingItem icon={Gem} size={30} top="65%" left="10%" delay={2} springX={springX} springY={springY} factor={0.8} />
+        <FloatingItem icon={Crown} size={50} top="10%" left="82%" delay={4} springX={springX} springY={springY} factor={1.5} />
+        <FloatingItem icon={Sparkles} size={25} top="60%" left="85%" delay={1} springX={springX} springY={springY} factor={0.6} />
+        <FloatingItem icon={Diamond} size={22} top="35%" left="92%" delay={3} springX={springX} springY={springY} factor={1} />
 
         <div className="relative max-w-7xl mx-auto px-6 text-center">
-          <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="inline-flex items-center gap-2 bg-amber-500/10 text-amber-500 px-6 py-2 rounded-full mb-8 border border-amber-500/20">
-            <Award size={18} />
-            <span className="text-sm font-bold uppercase tracking-[0.3em]">Exclusive Offers</span>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="inline-flex items-center gap-3 bg-gradient-to-r from-amber-900/40 to-neutral-800/40 text-amber-400 px-6 py-2 rounded-full mb-8 border border-amber-500/30 backdrop-blur-sm shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+          >
+            <Award size={18} className="animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-[0.4em]">The Exclusive Sale</span>
           </motion.div>
 
-          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-6xl md:text-8xl font-serif text-white mb-8 leading-tight">
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-5xl md:text-7xl font-serif text-white mb-6 leading-[1.1] drop-shadow-2xl"
+          >
             Chương Trình <br />
-            <span className="text-amber-500 italic">Ưu Đãi Đặc Quyền</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-400 to-amber-700 italic drop-shadow-[0_4px_10px_rgba(245,158,11,0.3)]">Ưu Đãi Đặc Biệt</span>
           </motion.h1>
 
-          <p className="text-xl text-gray-400 max-w-3xl mx-auto font-light leading-relaxed mb-12">
-            Cơ hội cuối cùng để sở hữu những bộ sưu tập trang sức tinh xảo nhất với mức chiết khấu
-            lên đến <span className="text-amber-500 font-bold">70%</span>. Đẳng cấp vĩnh cửu trong tầm tay.
-          </p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-base text-gray-400 max-w-2xl mx-auto font-light leading-relaxed mb-8 border-l-2 border-amber-500/30 pl-8"
+          >
+            Nơi thời gian ngưng đọng trên những tuyệt tác. Cơ hội duy nhất để sở hữu sự vĩnh cửu
+            với đặc quyền ưu đãi lên đến <span className="text-amber-500 font-black">70%</span>.
+          </motion.p>
 
-          <div className="flex justify-center gap-6">
-            <button onClick={() => document.getElementById('deals')?.scrollIntoView({ behavior: 'smooth' })} className="bg-amber-500 text-neutral-900 px-10 py-4 rounded-full font-bold hover:bg-amber-400 transition transform hover:scale-105">
-              Khám Phá Deal Ngay
+          <div className="flex justify-center gap-8">
+            <button
+              onClick={() => document.getElementById('deals')?.scrollIntoView({ behavior: 'smooth' })}
+              className="group relative bg-amber-500 text-neutral-950 px-12 py-4 rounded-full font-black text-lg hover:shadow-[0_0_40px_rgba(245,158,11,0.4)] transition-all overflow-hidden"
+            >
+              <span className="relative z-10">BẮT ĐẦU TRẢI NGHIỆM</span>
+              <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
             </button>
           </div>
+
+          <div className="flex justify-center mt-8">
+             <div className="w-px h-12 bg-gradient-to-b from-amber-500/0 via-amber-500/50 to-amber-500/0"></div>
+          </div>
         </div>
+
+        {/* Decorative divider */}
+        <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#fafafa] to-transparent"></div>
       </section>
 
       {/* STATS SECTION */}

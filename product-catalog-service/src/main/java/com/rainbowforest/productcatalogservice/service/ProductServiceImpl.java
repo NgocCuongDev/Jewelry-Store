@@ -1,7 +1,9 @@
 package com.rainbowforest.productcatalogservice.service;
 
 import com.rainbowforest.productcatalogservice.entity.Product;
+import com.rainbowforest.productcatalogservice.entity.Category;
 import com.rainbowforest.productcatalogservice.repository.ProductRepository;
+import com.rainbowforest.productcatalogservice.repository.CategoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +15,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
 
     private static final String UPLOAD_DIR = "src/main/resources/static/";
 
@@ -47,11 +52,37 @@ public class ProductServiceImpl implements ProductService {
         Product existingProduct = productRepository.findById(id).orElse(null);
         if (existingProduct != null) {
             // Cleanup old image if it's being replaced
-            if (existingProduct.getImageUrl() != null && !existingProduct.getImageUrl().equals(product.getImageUrl())) {
+            if (existingProduct.getImageUrl() != null && product.getImageUrl() != null 
+                && !existingProduct.getImageUrl().equals(product.getImageUrl())) {
                 deleteImageFile(existingProduct.getImageUrl());
             }
-            product.setId(id);
-            return productRepository.save(product);
+            
+            // Update fields manually to avoid session conflicts and maintain audit fields
+            existingProduct.setProductName(product.getProductName());
+            existingProduct.setPrice(product.getPrice());
+            existingProduct.setDiscountPrice(product.getDiscountPrice());
+            existingProduct.setDescription(product.getDescription());
+            
+            // Fetch managed category from DB to avoid transient/detached entity issues
+            if (product.getCategory() != null && product.getCategory().getId() != null) {
+                Category managedCategory = categoryRepository.findById(product.getCategory().getId()).orElse(null);
+                existingProduct.setCategory(managedCategory);
+            } else {
+                existingProduct.setCategory(null);
+            }
+            
+            existingProduct.setAvailability(product.getAvailability());
+            existingProduct.setImageUrl(product.getImageUrl());
+            existingProduct.setActive(product.isActive());
+            
+            // Hibernate will handle updatedAt via @PreUpdate
+            try {
+                return productRepository.save(existingProduct);
+            } catch (Exception e) {
+                System.err.println("Database Update Error: " + e.getMessage());
+                e.printStackTrace();
+                throw e;
+            }
         }
         return null;
     }
