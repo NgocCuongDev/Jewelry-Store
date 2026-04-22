@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.rainbowforest.userservice.service.EmailService;
+import java.util.Map;
+
 @RestController
 public class AuthController {
     
@@ -20,6 +23,9 @@ public class AuthController {
     
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private EmailService emailService;
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
@@ -36,5 +42,46 @@ public class AuthController {
         }
         
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password");
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null) return ResponseEntity.badRequest().body("Email is required");
+
+        User user = userService.forgotPassword(email);
+        if (user != null) {
+            try {
+                emailService.sendResetCode(email, user.getResetCode());
+                return ResponseEntity.ok("Mã xác nhận đã được gửi tới email của bạn.");
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi khi gửi email xác nhận.");
+            }
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Email không tồn tại trong hệ thống.");
+    }
+
+    @PostMapping("/verify-reset-code")
+    public ResponseEntity<?> verifyResetCode(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String code = request.get("code");
+        
+        if (userService.verifyResetCode(email, code)) {
+            return ResponseEntity.ok("Mã xác thực chính xác.");
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Mã xác thực không hợp lệ hoặc đã hết hạn.");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String code = request.get("code");
+        String newPassword = request.get("newPassword");
+
+        if (userService.resetPassword(email, code, newPassword)) {
+            return ResponseEntity.ok("Mật khẩu đã được thay đổi thành công.");
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Không thể đổi mật khẩu. Vui lòng kiểm tra lại mã xác nhận.");
     }
 }

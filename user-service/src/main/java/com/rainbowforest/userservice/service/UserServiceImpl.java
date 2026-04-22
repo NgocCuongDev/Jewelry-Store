@@ -8,7 +8,9 @@ import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Random;
 
 @Service
 @Transactional
@@ -27,7 +29,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User getUserById(Long id) {
-        return userRepository.getOne(id);
+        return userRepository.findById(id).orElse(null);
     }
 
     @Override
@@ -98,11 +100,68 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User authenticateUser(String userName, String password) {
-        User user = userRepository.findByUserName(userName);
-        if (user != null && BCrypt.checkpw(password, user.getUserPassword())) {
-            return user;
+    public User authenticateUser(String identity, String password) {
+        System.out.println("DEBUG: Authenticating user with identity: " + identity);
+        
+        // Try finding by username first
+        User user = userRepository.findByUserName(identity);
+        
+        // If not found, try finding by email
+        if (user == null) {
+            System.out.println("DEBUG: User not found by username, searching by email...");
+            user = userRepository.findByUserDetailsEmail(identity);
+        }
+        
+        if (user != null) {
+            System.out.println("DEBUG: User found: " + user.getUserName());
+            boolean matches = BCrypt.checkpw(password, user.getUserPassword());
+            System.out.println("DEBUG: Password match: " + matches);
+            if (matches) {
+                return user;
+            } else {
+                System.out.println("DEBUG: Password mismatch for user: " + identity);
+            }
+        } else {
+            System.out.println("DEBUG: User not found by identity: " + identity);
         }
         return null;
+    }
+
+    @Override
+    public User forgotPassword(String email) {
+        User user = userRepository.findByUserDetailsEmail(email);
+        if (user != null) {
+            String code = String.format("%06d", new Random().nextInt(1000000));
+            user.setResetCode(code);
+            user.setResetCodeExpiry(LocalDateTime.now().plusMinutes(10));
+            return userRepository.save(user);
+        }
+        return null;
+    }
+
+    @Override
+    public boolean verifyResetCode(String email, String code) {
+        User user = userRepository.findByUserDetailsEmail(email);
+        return user != null && 
+               code != null &&
+               code.equals(user.getResetCode()) && 
+               user.getResetCodeExpiry() != null &&
+               user.getResetCodeExpiry().isAfter(LocalDateTime.now());
+    }
+
+    @Override
+    public boolean resetPassword(String email, String code, String newPassword) {
+        if (verifyResetCode(email, code)) {
+            User user = userRepository.findByUserDetailsEmail(email);
+            if (user != null) {
+                String hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+                user.setUserPassword(hashedPassword);
+                user.setResetCode(null);
+                user.setResetCodeExpiry(null);
+                userRepository.save(user);
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -40,8 +40,11 @@ public class Product {
     @Column (name = "image_url")
     private String imageUrl;
 
+    @Column (name = "category")
+    private String legacyCategory = "General";
+
     @Column (name = "active", nullable = false)
-    private Boolean active = true;
+    private boolean active = true;
 
     @Column (name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -128,11 +131,11 @@ public class Product {
 		this.imageUrl = imageUrl;
 	}
 
-	public Boolean isActive() {
+	public boolean isActive() {
 		return active;
 	}
 
-	public void setActive(Boolean active) {
+	public void setActive(boolean active) {
 		this.active = active;
 	}
 

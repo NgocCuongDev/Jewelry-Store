@@ -44,7 +44,35 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product addProduct(Product product) {
-        return productRepository.save(product);
+        System.out.println("📝 Attempting to add product: " + product.getProductName());
+        System.out.println("   - Price: " + product.getPrice());
+        System.out.println("   - Category ID: " + (product.getCategory() != null ? product.getCategory().getId() : "NULL"));
+        System.out.println("   - Active: " + product.isActive());
+
+        // Fetch managed category from DB to avoid transient/detached entity issues
+        if (product.getCategory() != null && product.getCategory().getId() != null) {
+            Category managedCategory = categoryRepository.findById(product.getCategory().getId()).orElse(null);
+            if (managedCategory != null) {
+                System.out.println("   - Managed Category found: " + managedCategory.getCategoryName());
+                product.setCategory(managedCategory);
+            } else {
+                System.out.println("   ⚠️ Warning: Category with ID " + product.getCategory().getId() + " not found!");
+            }
+        }
+
+        try {
+            Product saved = productRepository.save(product);
+            System.out.println("✅ Product saved successfully with ID: " + saved.getId());
+            return saved;
+        } catch (Exception e) {
+            System.err.println("❌ CRITICAL DATABASE ERROR while saving product:");
+            System.err.println("   Message: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.err.println("   Cause: " + e.getCause().getMessage());
+            }
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     @Override

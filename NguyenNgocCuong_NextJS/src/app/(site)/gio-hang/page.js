@@ -28,7 +28,7 @@ import {
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { createOrder } from "../api/apiOrder";
+// import { createOrder } from "../api/apiOrder"; // Đã dời sang trang /thanh-toan
 
 // 💎 FloatingItem Luxury cho Giỏ hàng
 const FloatingItem = ({ icon: Icon, delay = 0, size = 20, top = "50%", left = "50%", springX, springY, factor = 1 }) => {
@@ -117,45 +117,9 @@ export default function CartPage() {
   };
 
   // 🎯 SỬA LẠI: Thực hiện tạo đơn hàng ngay tại đây để không làm đứt gãy luồng
-  const handleCheckout = async () => {
-    if (!isAuthenticated) {
-      toast.error("Vui lòng đăng nhập để thanh toán");
-      router.push("/dang-nhap?redirect=gio-hang");
-      return;
-    }
-    
-    if (!form.name || !form.phone || !form.address) {
-      toast.error("Vui lòng nhập đầy đủ thông tin giao hàng!");
-      return;
-    }
-
-    setLoading(true);
-    const orderPromise = createOrder({
-      userId: user.id,
-      cartId: getCartId(),
-      custName: form.name,
-      custPhone: form.phone,
-      shippingAddress: form.address,
-      customerNote: form.note || "",
-      paymentMethod: "COD",
-      shipMethod: "Giao hang nhanh"
-    });
-
-    toast.promise(orderPromise, {
-      loading: 'Đang niêm phong đơn hàng...',
-      success: '🎉 Chúc mừng! Đơn hàng của bạn đã được xác nhận.',
-      error: (err) => err.message || 'Lỗi khi đặt hàng!'
-    });
-
-    try {
-      const response = await orderPromise;
-      clearCart(); // Xóa giỏ hàng local và backend
-      router.push(`/thank-you?orderId=${response.order?.id || response.id}`);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  // 🎯 CHUYỂN HƯỚNG SANG TRANG THANH TOÁN CHUYÊN BIỆT
+  const handleCheckout = () => {
+    navigateToCheckout();
   };
 
   // 🎯 HIỂN THỊ LOADING TRONG KHI CHƯA INITIALIZED

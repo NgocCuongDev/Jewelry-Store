@@ -3,6 +3,7 @@ package com.rainbowforest.userservice.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table (name = "users")
@@ -19,6 +20,12 @@ public class User {
     private String userPassword;
     @Column (name = "active")
     private int active;
+
+    @Column(name = "reset_code")
+    private String resetCode;
+
+    @Column(name = "reset_code_expiry")
+    private LocalDateTime resetCodeExpiry;
 
     @OneToOne (cascade = CascadeType.ALL)
     @JoinColumn (name = "user_details_id")
@@ -74,5 +81,21 @@ public class User {
 
 	public void setRole(UserRole role) {
 		this.role = role;
+	}
+
+	public String getResetCode() {
+		return resetCode;
+	}
+
+	public void setResetCode(String resetCode) {
+		this.resetCode = resetCode;
+	}
+
+	public LocalDateTime getResetCodeExpiry() {
+		return resetCodeExpiry;
+	}
+
+	public void setResetCodeExpiry(LocalDateTime resetCodeExpiry) {
+		this.resetCodeExpiry = resetCodeExpiry;
 	}
 }

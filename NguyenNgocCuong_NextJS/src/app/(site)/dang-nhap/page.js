@@ -558,6 +558,21 @@ export default function LoginPage() {
                       </motion.button>
                     </div>
                   </motion.div>
+                  
+                  {/* Forgot Password Link */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.25 }}
+                    className="flex justify-end"
+                  >
+                    <Link
+                      href="/quen-mat-khau"
+                      className="text-cyan-400/70 hover:text-cyan-300 text-sm font-light transition-colors hover:glow-cyan-sm"
+                    >
+                      Quên mật khẩu?
+                    </Link>
+                  </motion.div>
 
                   {/* Quantum Submit Button */}
                   <motion.button

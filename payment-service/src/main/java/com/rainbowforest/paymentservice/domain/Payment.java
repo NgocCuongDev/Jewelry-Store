@@ -33,6 +33,12 @@ public class Payment {
     @Column(name = "status")
     private String status; // SUCCESS, FAILED
 
+    @Column(name = "transaction_id")
+    private String transactionId;
+
+    @Column(name = "bank_code")
+    private String bankCode;
+
     @Column(name = "transaction_date")
     private LocalDateTime transactionDate;
 }

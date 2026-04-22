@@ -12,4 +12,7 @@ public interface UserService {
     User updateUser(Long id, User user);
     void deleteUser(Long id);
     User authenticateUser(String userName, String password);
+    User forgotPassword(String email);
+    boolean verifyResetCode(String email, String code);
+    boolean resetPassword(String email, String code, String newPassword);
 }

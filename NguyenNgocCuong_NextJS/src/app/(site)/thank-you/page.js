@@ -15,14 +15,22 @@ import {
   Sparkles,
   PartyPopper,
   ShieldCheck,
-  ChevronRight
+  ChevronRight,
+  AlertCircle
 } from "lucide-react";
 
 export default function ThankYouPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderId = searchParams.get('orderId');
-  const [countdown, setCountdown] = useState(7);
+  const paymentMode = searchParams.get('payment');
+  const vnpResponseCode = searchParams.get('vnp_ResponseCode');
+  const vnpTransactionNo = searchParams.get('vnp_TransactionNo');
+  
+  const isVnpay = paymentMode === 'vnpay';
+  const isSuccess = !isVnpay || vnpResponseCode === '00';
+  
+  const [countdown, setCountdown] = useState(isSuccess ? 7 : 20); // Longer countdown if failed
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -36,13 +44,13 @@ export default function ThankYouPage() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [isSuccess]);
 
   useEffect(() => {
-    if (countdown === 0) {
+    if (countdown === 0 && isSuccess) {
       router.push("/");
     }
-  }, [countdown, router]);
+  }, [countdown, router, isSuccess]);
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white overflow-hidden relative selection:bg-amber-500/30 selection:text-amber-200">
@@ -70,8 +78,12 @@ export default function ThankYouPage() {
             >
               <div className="relative">
                 <div className="absolute inset-0 bg-amber-500/20 blur-2xl rounded-full scale-150 animate-pulse" />
-                <div className="relative bg-gradient-to-tr from-amber-400 to-amber-600 p-6 rounded-full shadow-[0_0_40px_rgba(245,158,11,0.4)]">
-                  <CheckCircle size={48} className="text-black" />
+                <div className={`relative ${isSuccess ? 'bg-gradient-to-tr from-amber-400 to-amber-600' : 'bg-gradient-to-tr from-red-400 to-red-600'} p-6 rounded-full shadow-2xl`}>
+                  {isSuccess ? (
+                    <CheckCircle size={48} className="text-black" />
+                  ) : (
+                    <AlertCircle size={48} className="text-white" />
+                  )}
                 </div>
                 {/* Floating particles */}
                 {[...Array(6)].map((_, i) => (
@@ -95,15 +107,12 @@ export default function ThankYouPage() {
             </motion.div>
 
             <div className="text-center">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6"
-              >
-                <Sparkles size={14} className="text-amber-400" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-200/80">Order Confirmed Successfully</span>
-              </motion.div>
+                <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full ${isSuccess ? 'bg-white/5 border-white/10' : 'bg-red-500/10 border-red-500/20'} mb-6`}>
+                  <Sparkles size={14} className={isSuccess ? "text-amber-400" : "text-red-400"} />
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.2em] ${isSuccess ? 'text-amber-200/80' : 'text-red-200/80'}`}>
+                    {isSuccess ? 'Order Confirmed Successfully' : 'Payment Processing Failed'}
+                  </span>
+                </div>
 
               <motion.h1 
                 initial={{ opacity: 0, y: 20 }}
@@ -111,10 +120,21 @@ export default function ThankYouPage() {
                 transition={{ delay: 0.5 }}
                 className="text-5xl md:text-6xl font-serif font-light mb-6 tracking-tight text-white"
               >
-                Tuyệt vời! <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 animate-gradient-x italic">
-                  Cảm ơn bạn đã tin tưởng
-                </span>
+                {isSuccess ? (
+                  <>
+                    Tuyệt vời! <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 animate-gradient-x italic">
+                      Cảm ơn bạn đã tin tưởng
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Rất tiếc! <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-rose-500 to-red-400 animate-gradient-x italic font-medium">
+                      Thanh toán không thành công
+                    </span>
+                  </>
+                )}
               </motion.h1>
 
               <motion.p 
@@ -123,8 +143,11 @@ export default function ThankYouPage() {
                 transition={{ delay: 0.6 }}
                 className="text-lg text-neutral-400 font-light max-w-2xl mx-auto mb-12 leading-relaxed"
               >
-                Đơn hàng của bạn đã được niêm phong và gửi đến bộ phận vận chuyển cao cấp. 
-                Một email xác nhận chi tiết đã được gửi tới hòm thư của bạn.
+                {isSuccess ? (
+                  "Đơn hàng của bạn đã được niêm phong và gửi đến bộ phận vận chuyển cao cấp. Một email xác nhận chi tiết đã được gửi tới hòm thư của bạn."
+                ) : (
+                  "Giao dịch của bạn qua VNPAY đã xảy ra sự cố (Mã lỗi: " + vnpResponseCode + "). Đừng lo lắng, đơn hàng của bạn đã được ghi nhận ở trạng thái chờ thanh toán."
+                )}
               </motion.p>
             </div>
 
@@ -143,9 +166,17 @@ export default function ThankYouPage() {
                 <div className="flex flex-col items-center">
                   <span className="text-[10px] font-black uppercase tracking-[0.4em] text-neutral-500 mb-2">Tracking ID</span>
                   <div className="flex items-center gap-3">
-                    <Box size={20} className="text-amber-400" />
+                    <Box size={20} className={isSuccess ? "text-amber-400" : "text-neutral-500"} />
                     <span className="text-3xl font-serif font-medium text-white tracking-wider">#{orderId}</span>
                   </div>
+                  
+                  {isVnpay && (
+                    <div className="mt-4 px-3 py-1 bg-white/5 rounded-lg border border-white/5">
+                       <span className="text-[10px] text-neutral-400 uppercase tracking-widest">
+                         VNPay Ref: <span className="text-white">{vnpTransactionNo || 'N/A'}</span>
+                       </span>
+                    </div>
+                  )}
                   
                   <div className="w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-6" />
                   

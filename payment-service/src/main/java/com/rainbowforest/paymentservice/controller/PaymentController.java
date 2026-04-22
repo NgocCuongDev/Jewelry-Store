@@ -1,6 +1,7 @@
 package com.rainbowforest.paymentservice.controller;
 
 import com.rainbowforest.paymentservice.domain.Payment;
+import com.rainbowforest.paymentservice.dto.VNPayCallbackDTO;
 import com.rainbowforest.paymentservice.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,26 @@ public class PaymentController {
                                           @RequestParam(required = false) String method) {
         Payment payment = paymentService.processPayment(orderId, userId, amount, method);
         return new ResponseEntity<>(payment, HttpStatus.CREATED);
+    }
+
+    // Endpoint cho VNPay Callback từ Node.js Service
+    @PostMapping("/vnpay/callback")
+    public ResponseEntity<Payment> vnpayCallback(@RequestBody VNPayCallbackDTO callbackData) {
+        System.out.println("📩 Received VNPay Callback for Order: " + callbackData.getOrderId());
+        
+        // Chuyển đổi orderId từ String sang Long (VNPAY có thể gửi prefix như ORD_)
+        String cleanId = callbackData.getOrderId().replaceAll("[^0-9]", "");
+        Long orderId = Long.parseLong(cleanId);
+        
+        Payment payment = paymentService.saveVNPayPayment(
+            orderId, 
+            callbackData.getTransactionNo(), 
+            callbackData.getAmount(), 
+            callbackData.getStatus(), 
+            callbackData.getBankCode()
+        );
+        
+        return new ResponseEntity<>(payment, HttpStatus.OK);
     }
 
     @GetMapping("/order/{orderId}")

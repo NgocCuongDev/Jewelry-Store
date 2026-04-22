@@ -247,3 +247,34 @@ export const changePassword = async (passwordData) => {
     throw err;
   }
 };
+
+// Quên mật khẩu - QUY TRÌNH MỚI
+export const forgotPassword = async (email) => {
+  try {
+    const res = await api.post("accounts/forgot-password", { email });
+    return res.data;
+  } catch (err) {
+    console.error("❌ forgotPassword error:", err.response?.data || err.message);
+    throw err.response?.data || err.message;
+  }
+};
+
+export const verifyResetCode = async (email, code) => {
+  try {
+    const res = await api.post("accounts/verify-reset-code", { email, code });
+    return res.data;
+  } catch (err) {
+    console.error("❌ verifyResetCode error:", err.response?.data || err.message);
+    throw err.response?.data || err.message;
+  }
+};
+
+export const resetUserPassword = async (email, code, newPassword) => {
+  try {
+    const res = await api.post("accounts/reset-password", { email, code, newPassword });
+    return res.data;
+  } catch (err) {
+    console.error("❌ resetUserPassword error:", err.response?.data || err.message);
+    throw err.response?.data || err.message;
+  }
+};

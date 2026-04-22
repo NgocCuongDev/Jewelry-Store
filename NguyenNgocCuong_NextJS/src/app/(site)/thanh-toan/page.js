@@ -26,10 +26,10 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { createOrder } from "../api/apiOrder";
+import { createOrder, createVNPayPaymentUrl } from "../api/apiOrder";
 
 export default function CheckoutPage() {
-  const { cart, addToCart, removeFromCart, decreaseQty, clearCart, syncCartAfterOrder, cartInitialized } = useCart();
+  const { cart, addToCart, removeFromCart, decreaseQty, clearCart, syncCartAfterOrder, cartInitialized, getCartId } = useCart();
   const { user, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
@@ -135,7 +135,8 @@ export default function CheckoutPage() {
         customer_phone: form.phone,
         customer_address: form.address,
         note: form.note,
-        user_id: user?.id,
+        userId: user?.id,
+        cartId: getCartId(),
         order_items: orderItems,
         payment_method: paymentMethod
       };
@@ -143,10 +144,21 @@ export default function CheckoutPage() {
       console.log("💳 Processing payment with data:", orderData);
 
       const response = await createOrder(orderData);
+      const createdOrderId = response.order?.id || response.id;
+
+      // 🎯 NỀU LÀ VNPAY: CHUYỂN HƯỚNG SANG GIAO DIỆN VNPAY RIÊNG (LOCALHOST:5173)
+      if (paymentMethod === "vnpay") {
+        const vnpayUrl = `http://localhost:5173/?orderId=${createdOrderId}&amount=${total * 100}&email=${form.email}`;
+        toast.success("⚡ Đang kết nối với Cổng thanh toán VNPAY...");
+        setTimeout(() => {
+          window.location.href = vnpayUrl;
+        }, 1500);
+        return;
+      }
 
       syncCartAfterOrder([]);
       toast.success("🎉 Đặt hàng thành công! Đơn hàng đang được xử lý.");
-      router.push(`/thank-you?orderId=${response.order?.id || response.id}`);
+      router.push(`/thank-you?orderId=${createdOrderId}`);
 
     } catch (error) {
       console.error("❌ Payment error:", error);
@@ -619,6 +631,13 @@ function DeliveryInfo({ form, formErrors, onChange, user }) {
 function PaymentMethod({ paymentMethod, onChange }) {
   const methods = [
     {
+      id: "vnpay",
+      name: "Thanh toán qua VNPAY",
+      description: "Thanh toán an toàn qua cổng VNPAY (ATM, QR code, Thẻ quốc tế)",
+      icon: "💳",
+      recommended: true
+    },
+    {
       id: "cod",
       name: "Thanh toán khi nhận hàng (COD)",
       description: "Bạn chỉ phải thanh toán khi nhận được hàng",
@@ -653,24 +672,31 @@ function PaymentMethod({ paymentMethod, onChange }) {
         {methods.map((method) => (
           <label
             key={method.id}
-            className={`flex items-start p-4 border-2 rounded-xl cursor-pointer transition-all ${
+            className={`flex items-start p-4 border-2 rounded-xl cursor-pointer transition-all relative ${
               paymentMethod === method.id
-                ? 'border-green-500 bg-green-50'
+                ? 'border-blue-500 bg-blue-50/50'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
           >
+            {method.recommended && (
+              <span className="absolute -top-3 right-4 bg-blue-600 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest shadow-lg shadow-blue-500/30 z-10">
+                Khuyên dùng
+              </span>
+            )}
             <input
               type="radio"
               name="paymentMethod"
               value={method.id}
               checked={paymentMethod === method.id}
               onChange={(e) => onChange(e.target.value)}
-              className="mt-1 text-green-500 focus:ring-green-500"
+              className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
             />
             <div className="ml-3 flex-1">
               <div className="flex items-center">
                 <span className="text-xl mr-3">{method.icon}</span>
-                <span className="font-semibold text-gray-900">{method.name}</span>
+                <span className={`font-bold ${paymentMethod === method.id ? 'text-blue-900' : 'text-gray-900'}`}>
+                  {method.name}
+                </span>
               </div>
               <p className="text-sm text-gray-500 mt-1">{method.description}</p>
             </div>

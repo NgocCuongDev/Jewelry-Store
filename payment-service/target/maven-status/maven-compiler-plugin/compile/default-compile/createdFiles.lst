@@ -1,5 +1,6 @@
 com\rainbowforest\paymentservice\repository\PaymentRepository.class
+com\rainbowforest\paymentservice\service\PaymentService.class
 com\rainbowforest\paymentservice\PaymentServiceApplication.class
 com\rainbowforest\paymentservice\domain\Payment.class
+com\rainbowforest\paymentservice\dto\VNPayCallbackDTO.class
 com\rainbowforest\paymentservice\controller\PaymentController.class
-com\rainbowforest\paymentservice\service\PaymentService.class

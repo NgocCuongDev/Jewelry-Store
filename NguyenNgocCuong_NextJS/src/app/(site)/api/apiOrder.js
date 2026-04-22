@@ -177,3 +177,14 @@ export const exportInvoice = async (id) => {
     throw formatError(error);
   }
 };
+// ================== VNPAY INTEGRATION ==================
+export const createVNPayPaymentUrl = async (paymentData) => {
+  try {
+    console.log('?? Requesting VNPay payment URL for data:', paymentData);
+    const response = await api.post('vnpay/create-payment', paymentData);
+    return response.data;
+  } catch (error) {
+    console.error('? Error creating VNPay payment URL:', error);
+    throw error.response?.data || error;
+  }
+};
